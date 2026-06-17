@@ -24,7 +24,8 @@ const htmlCell = v => {
 };
 const safeStore = {
   get(key){ try { return localStorage.getItem(key); } catch { return null; } },
-  set(key,value){ try { localStorage.setItem(key,value); } catch {} }
+  set(key,value){ try { localStorage.setItem(key,value); } catch {} },
+  remove(key){ try { localStorage.removeItem(key); } catch {} }
 };
 const SUMMARY_KEY_PREFIX = 'p57-summary:v1';
 const SUMMARY_SECTIONS = [
@@ -65,8 +66,24 @@ const SUMMARY_SECTION_KEY_MAP = {
   funnelDetail: 'funnel-detail',
   formatDetail: 'format-detail'
 };
+const FORMULA_EXPLAINERS = {
+  gap: 'Gap %: (Current value - target or benchmark) / target or benchmark. For rate metrics the app shows percentage-point gap so fill, churn and conversion are not confused with rupee movement.',
+  mom: 'MoM: (This month - previous month) / absolute previous month. Rate metrics are shown as percentage-point movement.',
+  efficiency: 'Efficiency: schedule quality read using fill rate, class average, empty classes, late cancellations and revenue per class.',
+  risk: 'Risk: operating exposure from churn, expiries, low usage, weak fill, low conversion or negative movement; higher risk means earlier management intervention.',
+  source: 'Lead source conversion: converted first-visit members divided by first visits from the same source; if first-visit source rows are unavailable, CRM source rows are used as a fallback.',
+  move: 'Move: the recommended operating action selected from the strongest or weakest visible driver in the displayed table.',
+  fill: 'Fill %: checked-in attendance divided by available class capacity.',
+  conversion: 'Conversion %: converted clients divided by first visits or trials in the same row.',
+  retention: 'Retention %: retained clients divided by first visits or trials in the same row.',
+  churn: 'Churn risk: lapsed paid memberships divided by paid memberships expiring in the selected month.',
+  atv: 'ATV: net sales divided by transaction count.',
+  ltv: 'LTV: post-trial purchase value attributed to the new member, source or lead row.'
+};
 function summaryStorageKey(sectionKey){ return `${SUMMARY_KEY_PREFIX}:${state.period}:${state.studio}:${sectionKey}`; }
 function summarySectionKey(id){ return SUMMARY_SECTION_KEY_MAP[id] || id; }
+function clearSavedSummary(sectionKey){ safeStore.remove(summaryStorageKey(sectionKey)); }
+function clearSummaryOverrideForId(id){ clearSavedSummary(summarySectionKey(id)); }
 async function saveSummary(sectionKey, summary){
   safeStore.set(summaryStorageKey(sectionKey), summary);
   try {
@@ -187,6 +204,36 @@ function excludedMembership(name){
   return ['studiosingleclass','newcomers2for1','copperandclovessingleclass','copperclovessingleclass','copperandclovescredit','copperclovescredit'].some(x=>s.includes(x)||x.includes(s));
 }
 const paidChurnRows = (c=current()) => (c.churn||[]).filter(r=>Number(r.amount||0)>0 && !excludedMembership(r.MembershipClean));
+function aggregateRows(rows, groupIndex, init){
+  const map=new Map();
+  (rows||[]).forEach(r=>{
+    const key=String(r[groupIndex]||'Unattributed').trim()||'Unattributed';
+    if(!map.has(key)) map.set(key, init(key));
+    const out=map.get(key);
+    out.rows=(out.rows||0)+1;
+    const status=String(r[13]||'').toLowerCase();
+    const retained=String(r[14]||'').toLowerCase();
+    out.converted += /converted|won|sold|purchase/.test(status) ? 1 : 0;
+    out.retained += /retain|active|return|converted/.test(retained) ? 1 : 0;
+    out.ltv += Number(r[12]||0);
+    out.visitsPost += Number(r[9]||0);
+  });
+  return [...map.values()].map(r=>({
+    ...r,
+    newMembers:r.rows,
+    conversionRate:r.converted/Math.max(r.rows,1),
+    retentionRate:r.retained/Math.max(r.rows,1),
+    visitsPost:r.visitsPost/Math.max(r.rows,1)
+  })).sort((a,b)=>Number(b.newMembers||0)-Number(a.newMembers||0));
+}
+function fallbackSourceRows(){
+  const c=current();
+  if((c.sources||[]).length) return c.sources;
+  const ids=window.RAW_DRILL_INDEX?.index?.[`${state.period}|${state.studio}|newAll:all`]||[];
+  const rows=ids.map(i=>window.RAW_DRILL_INDEX?.rows?.newMembers?.[i]).filter(Boolean);
+  if(rows.length) return aggregateRows(rows,8,key=>({SourceClean:key, converted:0, retained:0, ltv:0, visitsPost:0}));
+  return (c.leadSources||[]).map(r=>({SourceClean:r.SourceGroup,newMembers:Number(r.trials||r.leads||0),converted:Number(r.won||0),retained:0,conversionRate:Number(r.winRate||0),retentionRate:0,ltv:Number(r.ltv||0),visitsPost:0,sourceKind:'leadSource'}));
+}
 function classUniqueMembers(cls){ return CLASS_UNIQUE_MEMBERS[`${state.period}|${state.studio}|${classOutcomeKey(cls?.Class||cls)}`] ?? null; }
 function trainerSessionDetail(name){ return TRAINER_SESSION_DETAIL[`${state.period}|${state.studio}|${name}`] || null; }
 function classOutcomeKey(name){
@@ -535,6 +582,7 @@ function insight(label,value,sub,key,tone='gold'){
 }
 function kpiDrill(key,label){
   const c=current(), s=c.summary;
+  const sourceRows=fallbackSourceRows();
   const leadYield=Number(s.newMembers||0)/Math.max(Number(s.leadCount||0),1);
   const renewalRate=Number(s.renewedMemberships||0)/Math.max(Number(s.expiringMemberships||0),1);
   const map={
@@ -547,8 +595,8 @@ function kpiDrill(key,label){
     fillRate:[['Class','Capacity','Attended','Booked','Fill','Late CX'], c.classes.map(r=>[trunc(r.Class,36),num(r.capacity),num(r.attendance),num(r.booked),pct(r.fill),num(r.late)])],
     checkedIn:[['Format','Sessions','Attended','Capacity','Fill','Revenue'], c.formats.map(r=>[r.name,num(r.classes),num(r.attendance),num(r.capacity),pct(r.fill),money(r.revenue)])],
     lateCancels:[['Class','Late Cancels','Empty','Sessions','Avg','Fill'], c.classes.map(r=>[trunc(r.Class,34),num(r.late),num(r.empty),num(r.classes),one(r.avg),pct(r.fill)])],
-    newMembers:[['Source','New','Converted','Retained','Conversion','LTV'], c.sources.map(r=>[trunc(r.SourceClean,34),num(r.newMembers),num(r.converted),num(r.retained),pct(r.conversionRate),money(r.ltv)])],
-    converted:[['Source','New','Converted','Retained','Conversion','Visits Post'], c.sources.map(r=>[trunc(r.SourceClean,34),num(r.newMembers),num(r.converted),num(r.retained),pct(r.conversionRate),one(r.visitsPost)])],
+    newMembers:[['Source','New','Converted','Retained','Conversion','LTV'], sourceRows.map(r=>[trunc(r.SourceClean,34),num(r.newMembers),num(r.converted),num(r.retained),pct(r.conversionRate),money(r.ltv)])],
+    converted:[['Source','New','Converted','Retained','Conversion','Visits Post'], sourceRows.map(r=>[trunc(r.SourceClean,34),num(r.newMembers),num(r.converted),num(r.retained),pct(r.conversionRate),one(r.visitsPost)])],
     conversionRate:[['Type','First Visits','Converted','Retained','Conversion','LTV'], c.newTypes.map(r=>[r.NewType,num(r.trials),num(r.converted),num(r.retained),pct(r.conversionRate),money(r.ltv)])],
     retentionRate:[['Type','First Visits','Converted','Retained','Retention','LTV'], c.newTypes.map(r=>[r.NewType,num(r.trials),num(r.converted),num(r.retained),pct(r.retentionRate),money(r.ltv)])],
     leadYield:[['Lead Source','Leads','Trials','Won','Trial Rate','Win Rate'], c.leadSources.map(r=>[trunc(r.SourceGroup,34),num(r.leads),num(r.trials),num(r.won),pct(r.trialRate),pct(r.winRate)])],
@@ -558,8 +606,14 @@ function kpiDrill(key,label){
     expiringMemberships:[['Membership','Expiring','Active','Frozen','Avg Sessions','Churn'], paidChurnRows(c).map(r=>[trunc(r.MembershipClean,34),num(r.expiring),num(r.active),num(r.frozen),one(r.avgSessionsPerMonth),pct(r.churnRate)])],
     avgSessionsUsedPct:[['Membership','Active','Usage','Avg Sessions / Month','Attendance Rate','No-shows'], paidChurnRows(c).map(r=>[trunc(r.MembershipClean,34),num(r.active),pct((r.avgUsage||0)/100),one(r.avgSessionsPerMonth),pct((r.avgAttendance||0)/100),num(r.noShows)])]
   };
+  const sourceMap={
+    salesRev:{kind:'all',value:'sales'}, atv:{kind:'all',value:'sales'}, purchaseFrequency:{kind:'all',value:'sales'},
+    sessionRev:{kind:'sessionAll',value:'all'}, revenuePerClass:{kind:'sessionAll',value:'all'}, classAvg:{kind:'sessionAll',value:'all'}, fillRate:{kind:'sessionAll',value:'all'}, checkedIn:{kind:'sessionAll',value:'all'}, lateCancels:{kind:'sessionAll',value:'all'},
+    newMembers:{kind:'newAll',value:'all'}, converted:{kind:'newAll',value:'all'}, conversionRate:{kind:'newAll',value:'all'}, retentionRate:{kind:'newAll',value:'all'},
+    leadYield:{kind:'leadAll',value:'all'}, churnRate:{kind:'lapsedAll',value:'all'}, activeMemberships:{kind:'lapsedAll',value:'all'}, renewedMemberships:{kind:'lapsedAll',value:'all'}, expiringMemberships:{kind:'lapsedAll',value:'all'}, avgSessionsUsedPct:{kind:'lapsedAll',value:'all'}
+  };
   const [headers,rows]=map[key]||[['Metric','Value','Context'],[[label,metricDisplay(key,s[key]||0),'Selected month headline value'],['Lead yield',pct(leadYield),'New members / CRM leads'],['Renewal rate',pct(renewalRate),'Renewed / expiring memberships']]];
-  return {title:`${label} drill-down`, summary:`${label} is calculated for ${meta().full} in ${periodLabel()}. The linked view shows the supporting component records, related operating drivers and calculation context behind the headline value.`, headers, rows, formula: formulaFor(label)};
+  return {title:`${label} drill-down`, summary:`${label} is calculated for ${meta().full} in ${periodLabel()}. The linked view shows the supporting item-level records first when raw source rows exist, plus related operating drivers and calculation context behind the headline value.`, headers, rows, formula: formulaFor(label), source: sourceMap[key]};
 }
 function formulaFor(label){ const hit=APP.formulas.find(f=>label.toLowerCase().includes(f.metric.toLowerCase().split(' ')[0])||f.metric.toLowerCase().includes(label.toLowerCase().split(' ')[0])); return hit ? `${hit.metric}: ${hit.formula}` : ''; }
 function previousPeriod(){
@@ -595,11 +649,11 @@ function renderCockpitSummary(lines){
   el.innerHTML=`<div class="cockpit-summary-copy"><div class="cockpit-summary-kicker"><span>Studio performance brief</span></div><h2>${esc(cockpitSummaryHeadline())}</h2><p>${esc(body)}</p></div><div class="cockpit-summary-meta"><span>Sales movement</span><strong>${esc(prev?changeText(s.salesRev,prev.salesRev):'No prior month')}</strong><span>Priority driver</span><strong>${esc(topFmt.name||'Schedule mix')}</strong></div>`;
 }
 function makeEditableSummary(el){
-  if(!el || el.dataset.editableReady === '1') return;
+  if(!el) return;
   el.dataset.editableReady = '1';
   const key = summarySectionKey(el.id);
   const saved = loadSavedSummary(key);
-  if (saved) el.innerHTML = `<div class="summary-copy">${esc(saved).replace(/\n/g,'<br>')}</div>`;
+  if (saved) el.innerHTML = `<div class="summary-copy">${esc(saved).replace(/\n/g,'<br>')}</div><span class="summary-edited-chip">Edited</span>`;
   el.classList.add('summary-shell');
   if (el.querySelector('.summary-toolbar')) return;
   const toolbar = document.createElement('div');
@@ -609,17 +663,36 @@ function makeEditableSummary(el){
   btn.className = 'summary-edit-btn';
   btn.setAttribute('aria-label', `Edit ${key} summary`);
   btn.innerHTML = '<span class="summary-edit-icon">✎</span>';
-  btn.addEventListener('click', async (event) => {
+  const reset = document.createElement('button');
+  reset.type = 'button';
+  reset.className = 'summary-reset-btn';
+  reset.textContent = 'Reset to AI';
+  reset.hidden = !saved;
+  reset.addEventListener('click', event=>{
     event.stopPropagation();
-    const currentText = el.textContent.trim();
-    const draft = window.prompt(`Edit ${key} summary`, currentText);
-    if (draft === null) return;
-    const cleaned = draft.trim();
-    el.innerHTML = `<div class="summary-copy">${esc(cleaned).replace(/\n/g,'<br>')}</div>`;
-    await saveSummary(key, cleaned);
-    makeEditableSummary(el);
+    clearSavedSummary(key);
+    render();
   });
-  toolbar.append(btn);
+  btn.addEventListener('click', (event) => {
+    event.stopPropagation();
+    const clone=el.cloneNode(true);
+    clone.querySelector('.summary-toolbar')?.remove();
+    clone.querySelector('.summary-edited-chip')?.remove();
+    const currentText = plainText(el.querySelector('.summary-copy')?.textContent || clone.textContent).trim();
+    const original = el.innerHTML;
+    el.innerHTML = `<div class="summary-editor"><textarea rows="5">${esc(currentText)}</textarea><div class="summary-editor-actions"><button type="button" class="summary-save-btn">Save</button><button type="button" class="summary-cancel-btn">Cancel</button></div></div>`;
+    const textarea=el.querySelector('textarea');
+    textarea?.focus();
+    el.querySelector('.summary-save-btn')?.addEventListener('click', async e=>{
+      e.stopPropagation();
+      const cleaned=(textarea?.value||'').trim();
+      await saveSummary(key, cleaned);
+      el.innerHTML = `<div class="summary-copy">${esc(cleaned).replace(/\n/g,'<br>')}</div><span class="summary-edited-chip">Edited</span>`;
+      makeEditableSummary(el);
+    });
+    el.querySelector('.summary-cancel-btn')?.addEventListener('click', e=>{ e.stopPropagation(); el.innerHTML=original; makeEditableSummary(el); });
+  });
+  toolbar.append(btn, reset);
   el.append(toolbar);
 }
 function applyEditableSummaries(){
@@ -901,6 +974,8 @@ async function refreshAiReadout({force=false}={}){
     const lines=Array.isArray(data?.lines) ? data.lines.map(x=>String(x||'').trim()).filter(Boolean).slice(0,8) : [];
     if(lines.length){
       safeStore.set(readoutCacheKey(),JSON.stringify(lines));
+      clearSummaryOverrideForId('readout');
+      clearSummaryOverrideForId('cockpitSummary');
       renderReadoutLines(lines);
       renderCockpitSummary(lines);
     }
@@ -933,9 +1008,11 @@ function tableInsightCacheKey(tableId,snapshot){
 function setTableInsight(summaryId,text){
   const el=document.getElementById(summaryId);
   if(!el) return;
+  if(loadSavedSummary(summarySectionKey(summaryId))) { makeEditableSummary(el); return; }
   const insight=normalizeGeneratedInsight(text);
   const body=insight.replace(/^key insight:\s*/i,'');
   el.innerHTML=`<b>Key insight:</b> ${esc(body)}`;
+  makeEditableSummary(el);
 }
 function queueTableInsight(summaryId, tableId, title, fallback){
   const summaryEl=document.getElementById(summaryId);
@@ -974,6 +1051,7 @@ async function refreshTableInsights(){
       const data=await res.json();
       const insight=normalizeGeneratedInsight(data?.insight||job.fallback);
       safeStore.set(job.cacheKey,insight);
+      clearSummaryOverrideForId(job.summaryId);
       setTableInsight(job.summaryId,insight);
     }catch(e){
       if(e.name==='AbortError') return;
@@ -989,11 +1067,11 @@ function periodsFrom(startKey){
 }
 function trendFmt(key){ return v=>key.includes('Rate')?pct(v):(key==='revenuePerVisit'||key.includes('Rev')||key==='revenuePerClass'||key==='newRevenue'||key==='renewedRevenue')?money(v):(key==='classAvg')?one(v):num(v); }
 function openPeriodDrillPanel(payload){
-  const {title,summary,headers,rows,body}=payload;
+  const {title,summary,headers,rows,body,formula}=payload;
   lastFocus=lastFocus||document.activeElement;
   $('#drillTitle').textContent=title||'';
   $('#drillSummary').innerHTML=summary?`<b>Context:</b> ${esc(summary)}`:'';
-  $('#drillFormula').innerHTML='';
+  $('#drillFormula').innerHTML=formula?`<section class="drill-card drill-formula-card"><div class="drill-section-title">Calculation rule</div><code>${esc(formula)}</code></section>`:'';
   if(body){
     $('#drillBody').innerHTML=body;
   } else {
@@ -1047,6 +1125,7 @@ function openTrendPeriodDrill(period){
   ]);
 
   const tagRows=purchaseTags.map(r=>[trunc(r.PurchaseTag||'-',24),money(r.revenue||0),num(r.buyers||0),num(r.items||0)]);
+  const tx=salesSourceRowsFor({kind:'all',value:'sales'},50,period,state.studio);
 
   const summaryRows=[
     ['Period',periodLabel(period)],
@@ -1076,13 +1155,14 @@ function openTrendPeriodDrill(period){
 
   const bodyHtml=`
     ${sectionHtml('Revenue Summary', ['Metric','Value'], summaryRows)}
+    ${tx.total ? sectionHtml(`Actual transaction rows (${num(tx.rows.length)} of ${num(tx.total)})`, tx.headers, tx.rows) : ''}
     ${tagRows.length ? sectionHtml('Revenue by Purchase Tag', ['Tag','Revenue','Buyers','Units'], tagRows) : ''}
     ${membershipTableRows.length ? sectionHtml('Membership Churn & Revenue', membershipTableHeaders, membershipTableRows) : ''}
     ${categoryTableRows.length ? sectionHtml('Sales Category Mix', categoryTableHeaders, categoryTableRows) : ''}
     ${productTableRows.length ? sectionHtml('Product Revenue', productTableHeaders, productTableRows) : ''}
   `;
 
-  openPeriodDrillPanel({title, summary, headers:['Metric','Value'], rows:summaryRows, body:bodyHtml});
+  openPeriodDrillPanel({title, summary, headers:['Metric','Value'], rows:summaryRows, body:bodyHtml, formula:FORMULA_EXPLAINERS.atv});
 }
 function openMixPeriodDrill(period){
   const pd=APP.data[period]?.[state.studio];
@@ -1126,6 +1206,7 @@ function openMixPeriodDrill(period){
     num(r.sessions), num(r.attendance), one(r.avg), pct(r.fill),
     num(r.late), money(r.revenue)
   ]);
+  const raw=salesSourceRowsFor({kind:'sessionAll',value:'all'},50,period,state.studio);
 
   const sectionHtml=(heading, headers, rows)=>{
     if(!rows.length) return '';
@@ -1134,13 +1215,14 @@ function openMixPeriodDrill(period){
 
   const bodyHtml=`
     ${sectionHtml('Schedule Summary',['Metric','Value'],summaryRows)}
+    ${raw.total ? sectionHtml(`Actual session rows (${num(raw.rows.length)} of ${num(raw.total)})`, raw.headers, raw.rows) : ''}
     ${sectionHtml('Class Breakdown — '+cfg.label, classHeaders, classRows)}
   `;
 
   openPeriodDrillPanel({
     title:`${periodLabel(period)} — ${cfg.label} Breakdown`,
     summary:`${periodLabel(period)}: ${cfg.fmt(mode==='fillRate'?Number(s.fillRate||0):mode==='classAvg'?Number(s.classAvg||0):mode==='emptyClasses'?Number(s.emptyClasses||0):mode==='sessions'?Number(s.classes||0):mode==='visits'?Number(s.checkedIn||0):mode==='lateCancels'?Number(s.lateCancels||0):0)} ${cfg.label.toLowerCase()}. ${num(s.classes||0)} sessions across ${num((pd.classes||[]).length)} class types.`,
-    headers:['Metric','Value'], rows:summaryRows, body:bodyHtml
+    headers:['Metric','Value'], rows:summaryRows, body:bodyHtml, formula:FORMULA_EXPLAINERS.efficiency
   });
 }
 function selectedTrendPeriod(){
@@ -1209,7 +1291,7 @@ function renderTrend(){
     const barW=Math.max((Math.max(v,0)/yMax)*plotW, 6);
     const isLatest=i===0;
     const labelText=periodLabel(ps[i]);
-    const drill=drillAttr({title:`${periodLabel(ps[i])} — ${label}`,summary:`${fmt(v)} for ${periodLabel(ps[i])}.`,headers:['Month','Value'],rows:ps.map((m,j)=>[periodLabel(m),fmt(vals[j])]),formula:formulaFor(key)});
+    const drill=`data-trend-period="${ps[i]}" tabindex="0" role="button" aria-label="Show ${periodLabel(ps[i])} item-level sales breakdown"`;
     const valueText=fmt(v);
     const valueWidth=Math.max(42, String(valueText).length*6.8);
     const valueInside=barW > Math.max(110, valueWidth + 34);
@@ -1254,7 +1336,7 @@ function renderTrendSummary(){
   // direction language
   const isNegativeMetric=key==='lateCancels'||key==='emptyClasses'||key==='churnedMemberships'||key==='churnRate';
   const trend=last>=avg ? (isNegativeMetric ? 'above average — watch this closely' : 'above the period average — a positive signal') : (isNegativeMetric ? 'below average — healthy' : 'below the period average — monitor for recovery');
-  $('#trendSummary').innerHTML=`<b>${label}</b> is <b>${fmt(last)}</b> this month — ${trend}. <span class="trend-mom">${momText}</span> <span class="trend-yoy">${yoyText}</span>`;
+  $('#trendSummary').innerHTML=`<b>${label}</b> is <b>${fmt(last)}</b> this month — ${trend}. <span class="trend-mom">${momText}</span> <span class="trend-yoy">${yoyText}</span><span class="formula-inline">${esc(FORMULA_EXPLAINERS.mom)}</span>`;
   const s=current().summary;
   if(key==='salesRev'){
     $('#trendDetail').innerHTML='';
@@ -1362,7 +1444,7 @@ function renderMixChart(){
   <text class="trend-baseline-label" x="${w-padR-89}" y="${h-21}" text-anchor="middle">period avg ${trendFmtFn(avg)}</text>
 </svg>`;
 
-  $('#mixChartSummary').innerHTML=`<b>${cfg.label}:</b> ${cfg.summary} across all periods. Click any bar to see the class breakdown for that month.`;
+  $('#mixChartSummary').innerHTML=`<b>${cfg.label}:</b> ${cfg.summary} across all periods. Click any bar to see the actual session rows and class breakdown for that month. <span class="formula-inline">${esc(mode==='fillRate'?FORMULA_EXPLAINERS.fill:FORMULA_EXPLAINERS.efficiency)}</span>`;
   $('#mixChartDetail').innerHTML=detailTiles([[cfg.label,trendFmtFn(vals.at(-1))],['Periods shown',num(ps.length)],['Period avg',trendFmtFn(avg)],['Action',cfg.action]]);
   renderNextThirtyFocus();
   renderMixSideSummary(cfg, (c.classes||[]).map(r=>({name:r.Class,format:r.Format,value:Number(r[cfg.key]||0),fill:Number(r.fill||0),revenue:Number(r.revenue||0),classes:Number(r.classes||0)})).sort((a,b)=>b.value-a.value).slice(0,7));
@@ -1454,13 +1536,13 @@ function bindCustomNotes(){
 }
 function renderLeadIntakeFlow(){ const c=current(); if(!c.leadSources||!c.leadSources.length) return; const total=c.leadSources.reduce((a,r)=>a+Number(r.leads||0),0); const top=[...c.leadSources].sort((a,b)=>Number(b.leads||0)-Number(a.leads||0)).slice(0,5); $('#leadSummary').innerHTML=`<b>Key insight:</b> <b>${top[0]?.SourceGroup||'-'}</b> is the largest CRM intake source with <b>${num(top[0]?.leads||0)}</b> leads (${pct(Number(top[0]?.leads||0)/Math.max(total,1))} of total). Win rate is <b>${pct(top[0]?.winRate||0)}</b>.`; }
 function renderHeatmap(){ }
-function renderTables(){ const c=current(); $('#formatTable').innerHTML=nestedFormatTable(c); $('#formatTableSummary').innerHTML=summarizeFormats(c.formats)+renderCustomNote('formatTable');
+function renderTables(){ const c=current(), sourceRows=fallbackSourceRows(); $('#formatTable').innerHTML=nestedFormatTable(c); $('#formatTableSummary').innerHTML=summarizeFormats(c.formats)+renderCustomNote('formatTable');
   $('#classTable').innerHTML=table(['Class','Fmt','Cls','Empty','Members','Avg','Fill','Late','Revenue'], c.classes.map(r=>{ const members=classUniqueMembers(r); return {cells:[trunc(r.Class,34),fmtPill(r.Format),num(r.classes),num(r.empty),members===null?'-':num(members),one(r.avg),barPct(r.fill),num(r.late),money(r.revenue)], drill:{title:r.Class,summary:`${r.Class} contributed ${money(r.revenue)} from ${num(r.classes)} sessions with ${num(r.empty)} empty classes and ${members===null?'unavailable':num(members)} unique members.`,headers:['Metric','Value'],rows:[['Format',r.Format],['Classes',num(r.classes)],['Empty classes',num(r.empty)],['Unique members',members===null?'-':num(members)],['Attendance',num(r.attendance)],['Capacity',num(r.capacity)],['Booked',num(r.booked)],['Fill',pct(r.fill)],['Late cancellations',num(r.late)],['Revenue / class',money(r.revPerClass)]],source:{kind:'sessionClass',value:r.Class}}}}).slice(0,12)); $('#classTableSummary').innerHTML=summarizeTop(c.classes,'Class','revenue','Top class')+renderCustomNote('classTable');
   const trainerRows=c.trainers.map(r=>{ const d=trainerSessionDetail(r.Trainer)||{}; const cls=Number(d.classes??r.classes), empty=Number(d.empty??0), active=Number(d.nonEmpty??Math.max(cls-empty,0)), pax=Number(d.attendance??r.attendance), avgIncl=Number(d.avgInclEmpty??r.avg), avgExcl=Number(d.avgExclEmpty??r.avg), fill=Number(d.fill??r.fill), late=Number(d.late??r.late), rev=Number(d.revenue??r.revenue); return {metrics:{cls,empty,active,pax,avgIncl,avgExcl,fill,newMembers:Number(r.newMembers||0),converted:Number(r.converted||0),retained:Number(r.retained||0),conversionRate:Number(r.conversionRate||0),late,rev,score:Number(r.score||0)},cells:[trunc(r.Trainer,28),num(cls),num(empty),num(active),num(pax),one(avgIncl),one(avgExcl),barPct(fill),num(r.newMembers),num(r.converted),num(r.retained),barPct(r.conversionRate),num(late),money(rev),one(r.score)], drill:{title:r.Trainer,summary:`${r.Trainer} has ${num(cls)} session rows, including ${num(empty)} empty sessions and ${num(active)} active sessions.`,headers:['Metric','Value'],rows:[['Sessions',num(cls)],['Empty sessions',num(empty)],['Non-empty sessions',num(active)],['Attendance',num(pax)],['Class avg incl. empty',one(avgIncl)],['Class avg excl. empty',one(avgExcl)],['Fill',pct(fill)],['Late cancels',num(late)],['New members',num(r.newMembers)],['Converted',num(r.converted)],['Retained',num(r.retained)],['Conversion rate',pct(r.conversionRate)],['Revenue',money(rev)],['Score',one(r.score)]],source:{kind:'sessionTrainer',value:r.Trainer}}}; }).slice(0,14);
   const trainerTotals=trainerRows.reduce((a,r)=>{ const m=r.metrics; a.cls+=m.cls; a.empty+=m.empty; a.active+=m.active; a.pax+=m.pax; a.newMembers+=m.newMembers; a.converted+=m.converted; a.retained+=m.retained; a.late+=m.late; a.rev+=m.rev; a.score+=m.score; return a; },{cls:0,empty:0,active:0,pax:0,newMembers:0,converted:0,retained:0,late:0,rev:0,score:0});
   const trainerFooter=['Total',num(trainerTotals.cls),num(trainerTotals.empty),num(trainerTotals.active),num(trainerTotals.pax),one(trainerTotals.pax/Math.max(trainerTotals.cls,1)),one(trainerTotals.pax/Math.max(trainerTotals.active,1)),barPct(trainerTotals.pax/Math.max(trainerRows.reduce((a,r)=>a+(r.metrics.fill ? r.metrics.pax/r.metrics.fill : 0),0),1)),num(trainerTotals.newMembers),num(trainerTotals.converted),num(trainerTotals.retained),barPct(trainerTotals.converted/Math.max(trainerTotals.newMembers,1)),num(trainerTotals.late),money(trainerTotals.rev),one(trainerTotals.score/Math.max(trainerRows.length,1))];
   $('#trainerTable').innerHTML=table(['Instructor','Cls','Empty','Active','Pax','Avg incl','Avg excl','Fill','New','Conv','Ret.','Conv %','Late','Rev','Score'], trainerRows, {footerCells:trainerFooter}); $('#trainerSummary').innerHTML=summarizeTop(c.trainers,'Trainer','score','Top instructor')+renderCustomNote('trainerTable');
-  $('#sourceTable').innerHTML=table(['First-visit source','New','Conv','Rate','LTV'], c.sources.map(r=>({cells:[trunc(r.SourceClean,30),num(r.newMembers),num(r.converted),barPct(r.conversionRate),money(r.ltv)], drill:{title:`Source: ${r.SourceClean}`,summary:`${r.SourceClean} created ${num(r.newMembers)} first visits at ${pct(r.conversionRate)} conversion.`,headers:['Metric','Value'],rows:[['New members',num(r.newMembers)],['Converted',num(r.converted)],['Retained',num(r.retained)],['Retention',pct(r.retentionRate)],['LTV',money(r.ltv)],['Avg visits post trial',one(r.visitsPost)]],source:{kind:'newSource',value:r.SourceClean}}})).slice(0,10)); $('#sourceSummary').innerHTML=summarizeTop(c.sources,'SourceClean','newMembers','Largest source');
+  $('#sourceTable').innerHTML=table(['First-visit source','New','Conv','Rate','LTV'], sourceRows.map(r=>({cells:[trunc(r.SourceClean,30),num(r.newMembers),num(r.converted),barPct(r.conversionRate),money(r.ltv)], drill:{title:`Source: ${r.SourceClean}`,summary:`${r.SourceClean} created ${num(r.newMembers)} first visits at ${pct(r.conversionRate)} conversion. ${r.sourceKind==='leadSource'?'This row falls back to CRM source data because first-visit source attribution is unavailable for the selected month.':''}`,headers:['Metric','Value'],rows:[['New members / trials',num(r.newMembers)],['Converted / won',num(r.converted)],['Retained',num(r.retained)],['Conversion',pct(r.conversionRate)],['Retention',pct(r.retentionRate)],['LTV',money(r.ltv)],['Avg visits post trial',one(r.visitsPost)]],source:r.sourceKind==='leadSource'?{kind:'leadSource',value:r.SourceClean}:{kind:'newAll',value:'all'}}})).slice(0,10)); $('#sourceSummary').innerHTML=summarizeTop(sourceRows,'SourceClean','newMembers','Largest source')+` <span class="formula-inline">${esc(FORMULA_EXPLAINERS.source)}</span>`;
   $('#leadSourceTable').innerHTML=table(['Lead source','Leads','Trials','Won','Win'], c.leadSources.map(r=>({cells:[trunc(r.SourceGroup,30),num(r.leads),num(r.trials),num(r.won),barPct(r.winRate)], drill:{title:`CRM source: ${r.SourceGroup}`,summary:`${r.SourceGroup} generated ${num(r.leads)} CRM leads and ${num(r.won)} won outcomes.`,headers:['Metric','Value'],rows:[['Leads',num(r.leads)],['Trials',num(r.trials)],['Trial rate',pct(r.trialRate)],['Won',num(r.won)],['Win rate',pct(r.winRate)],['Lead LTV',money(r.ltv)]],source:{kind:'leadSource',value:r.SourceGroup}}})).slice(0,10)); $('#leadSummary').innerHTML=summarizeTop(c.leadSources,'SourceGroup','leads','Largest CRM source');
   $('#typeTable').innerHTML=table(['New member type','Trials','Conv','Retained','Conv %'], c.newTypes.map(r=>({cells:[trunc(r.NewType,30),num(r.trials),num(r.converted),num(r.retained),barPct(r.conversionRate)], drill:{title:r.NewType,summary:`${r.NewType} had ${num(r.trials)} trials and ${num(r.converted)} conversions.`,headers:['Metric','Value'],rows:[['Trials',num(r.trials)],['Converted',num(r.converted)],['Retained',num(r.retained)],['Conversion',pct(r.conversionRate)],['Retention',pct(r.retentionRate)],['LTV',money(r.ltv)]],source:{kind:'newType',value:r.NewType}}})).slice(0,10)); $('#typeSummary').innerHTML=summarizeTop(c.newTypes,'NewType','trials','Largest trial type');
   $('#categoryTable').innerHTML=table(['Category','Revenue','Items','Buyers','Share'], c.categories.map(r=>({cells:[trunc(r.Category,24),money(r.revenue),num(r.items),num(r.buyers),barPct(r.share)], drill:{title:`Category: ${r.Category}`,summary:`${r.Category} contributed ${money(r.revenue)}, equal to ${pct(r.share)} of selected-month sales.`,headers:['Metric','Value'],rows:[['Revenue',money(r.revenue)],['Items',num(r.items)],['Buyers',num(r.buyers)],['Share',pct(r.share)],['AUV',money(r.auv)]],source:{kind:'category',value:r.Category}}})).slice(0,10)); $('#categorySummary').innerHTML=summarizeTop(c.categories,'Category','revenue','Top category')+renderCustomNote('categoryTable');
@@ -1581,14 +1663,14 @@ function renderBusiness(){
     {move:'Schedule emphasis', focus:topWeekday.Day||'-', signal:money(topWeekday.revenue||0), why:'Strongest weekday revenue', next:'Anchor campaigns here', owner:'Studio Ops', confidence:'Medium', source:{kind:'sessionWeekday',value:topWeekday.Day||'-'}, rows:[['Why flagged','Highest weekday revenue concentration'],['Classes',num(topWeekday.classes||0)],['Attendance',num(topWeekday.attendance||0)],['Fill',pct(topWeekday.fill||0)],['Revenue',money(topWeekday.revenue||0)],['Recommended action','Use this weekday as the anchor for launches, guest passes and renewal nudges']]},
     {move:'Daypart focus', focus:topDaypart.Daypart||'-', signal:money(topDaypart.revenue||0), why:'Strongest daypart revenue', next:'Tune staffing and offers', owner:'Studio Ops', confidence:'Medium', source:{kind:'sessionDaypart',value:topDaypart.Daypart||'-'}, rows:[['Why flagged','Highest daypart revenue concentration'],['Classes',num(topDaypart.classes||0)],['Attendance',num(topDaypart.attendance||0)],['Fill',pct(topDaypart.fill||0)],['Revenue',money(topDaypart.revenue||0)],['Recommended action','Align instructor cover, front-desk conversion and trial offers around this time band']]}
   ];
-  $('#businessSummary').innerHTML=`<b>Key insight:</b> Revenue efficiency is <b>${money(s.revenuePerClass)}</b> per class and <b>${money(s.revenuePerAttendee)}</b> per attendee. Renewal conversion is <b>${pct(renewalRate)}</b>, while new purchase revenue represents <b>${pct(newShare)}</b> of sales mix.`;
+  $('#businessSummary').innerHTML=`<b>Key insight:</b> Revenue efficiency is <b>${money(s.revenuePerClass)}</b> per class and <b>${money(s.revenuePerAttendee)}</b> per attendee. Renewal conversion is <b>${pct(renewalRate)}</b>, while new purchase revenue represents <b>${pct(newShare)}</b> of sales mix. <span class="formula-inline">${esc(FORMULA_EXPLAINERS.gap)} ${esc(FORMULA_EXPLAINERS.mom)}</span>`;
   $('#businessMetricGrid').innerHTML='';
   $('#growthTable').innerHTML=table(['Metric','Current','Target / Benchmark','MoM','Gap','Trend','Priority','Action'], growthRows);
   if($('#revenueQualityTable')) $('#revenueQualityTable').innerHTML=table(['Revenue Driver','Value','Share of Revenue','MoM','Read'], revenueQualityRows.map(r=>({cells:[r.driver,r.value,r.share,r.mom,r.read],drill:{title:`Revenue quality: ${r.driver}`,summary:r.read,headers:['Metric','Value'],rows:r.rows,source:r.source||{kind:'all',value:'sales'}}})));
   $('#mixTable').innerHTML=table(['Signal','Base','Converted / Active','Revenue Impact','Rate','Risk / Read'], mixRows.map(r=>({cells:[r.label,r.base,r.converted,r.impact,r.rate,r.risk],drill:{title:r.label,summary:`${r.label}: ${r.risk}`,headers:['Metric','Value'],rows:r.rows,source:r.source}})));
   if($('#whatChangedTable')) $('#whatChangedTable').innerHTML=table(['Movement','Previous Month','This Month','Change','Main Reason','Action'], whatChangedRows.map(r=>({cells:r.cells,drill:r.drill})));
   $('#businessMixExplanation').innerHTML=`<b>How to read this mix:</b><ul><li><span>New revenue</span><div>Shows how much sales value came from new purchase behavior, useful for acquisition quality and offer fit.</div></li><li><span>Renewal revenue</span><div>Shows returning value from existing community members, useful for retention and package timing.</div></li><li><span>Productivity</span><div>ATV and purchase frequency explain whether revenue is being driven by larger receipts or more repeated buying.</div></li><li><span>Retention risk</span><div>Renewal conversion, lapse exposure and usage indicate whether expiring members need outreach before revenue is lost.</div></li></ul>`;
-  $('#businessOpportunityExplanation').innerHTML=`<b>What this queue is telling you:</b><ul><li><span>Move</span><div>The business lever to act on this month, selected from acquisition, conversion, product, class and schedule signals.</div></li><li><span>Why flagged</span><div>The reason the row made the queue, so the table is not just a ranking without context.</div></li><li><span>Next action</span><div>The recommended operational action for the studio team. Click any cell to see the row-level source records behind the signal.</div></li></ul>`;
+  $('#businessOpportunityExplanation').innerHTML=`<b>What this queue is telling you:</b><ul><li><span>Move</span><div>${esc(FORMULA_EXPLAINERS.move)}</div></li><li><span>Why flagged</span><div>The reason the row made the queue, so the table is not just a ranking without context.</div></li><li><span>Next action</span><div>The recommended operational action for the studio team. Click any cell to see the row-level source records behind the signal.</div></li><li><span>Lift source conversion</span><div>${esc(FORMULA_EXPLAINERS.source)}</div></li></ul>`;
   $('#riskTable').innerHTML=table(['Membership','Exp.','Lapsed','Churn','Use/mo','Risk','Action'], riskRows);
   $('#churnRiskExplanation').innerHTML=`<b>How churn risk is calculated:</b><ul><li><span>Formula</span><div>Churn risk = lapsed paid memberships divided by paid memberships expiring in the selected month.</div></li><li><span>Risk band</span><div>High means high churn rate or high-volume exposure, Medium means elevated risk or low usage, Watch means lower immediate risk.</div></li><li><span>Action</span><div>Low-usage/high-risk rows need direct outreach; healthier renewal rows need script protection and monitoring.</div></li></ul>`;
   $('#recentChurned').innerHTML=`<div class="churned-list">${recent.length?recent.map(m=>`<div class="churned-member"><strong>${esc(trunc(m.name,24))}</strong><span>${esc(trunc(m.membership,30))}</span><b>${money(m.amount)}</b><small>${num(m.sessions)} sessions • ${one(m.avgMonthly)} / mo • ${pct(m.attendance)}</small></div>`).join(''):'<div class="empty">No recent paid churned members after exclusions.</div>'}</div>`;
@@ -1720,10 +1802,13 @@ function compareTextForCell(header, value, parsed, rows, cellIndex, selectedInde
     ['Share of column',total&&parsed.type!=='pct'&&parsed.type!=='mult'?pct(parsed.value/total):'n/a']
   ];
 }
-function salesDrillRows(source){
+function salesDrillRows(source, period=state.period, studio=state.studio){
   if(!source || !window.SALES_DRILL_INDEX) return [];
-  const ids=window.SALES_DRILL_INDEX.index?.[`${state.period}|${state.studio}|${source.kind}:${source.value}`]||[];
+  const ids=window.SALES_DRILL_INDEX.index?.[`${period}|${studio}|${source.kind}:${source.value}`]||[];
   return ids.map(i=>window.SALES_DRILL_INDEX.rows[i]).filter(Boolean);
+}
+function sourceLabel(dataset){
+  return ({sales:'Source transactions',sessions:'Raw session rows',newMembers:'Raw new-member rows',leads:'Raw CRM lead rows',lapsed:'Raw lapsed-member rows'})[dataset] || 'Source rows';
 }
 function drillSourceDataset(source){
   const salesKinds=new Set(['all','category','product','member','seller','purchaseTag']);
@@ -1736,9 +1821,9 @@ function drillSourceDataset(source){
   };
   return map[source?.kind] || '';
 }
-function rawDrillRows(source){
+function rawDrillRows(source, period=state.period, studio=state.studio){
   if(!source || !window.RAW_DRILL_INDEX) return [];
-  const ids=window.RAW_DRILL_INDEX.index?.[`${state.period}|${state.studio}|${source.kind}:${source.value}`]||[];
+  const ids=window.RAW_DRILL_INDEX.index?.[`${period}|${studio}|${source.kind}:${source.value}`]||[];
   const dataset=drillSourceDataset(source);
   return ids.map(i=>window.RAW_DRILL_INDEX.rows?.[dataset]?.[i]).filter(Boolean);
 }
@@ -1759,9 +1844,9 @@ function salesDrillValue(row, i){
   if(i===7) return `${one(Number(row[i]||0))}%`;
   return row[i] || '-';
 }
-function salesSourceRowsFor(source, limit=300){
+function salesSourceRowsFor(source, limit=300, period=state.period, studio=state.studio){
   const dataset=drillSourceDataset(source);
-  const rows=dataset==='sales' ? salesDrillRows(source) : rawDrillRows(source);
+  const rows=dataset==='sales' ? salesDrillRows(source,period,studio) : rawDrillRows(source,period,studio);
   const picks={
     sales:[0,1,3,2,4,5,6,7,10,11,12,13,14],
     sessions:[0,1,2,3,4,5,6,7,8,9,10,11,12,13],
@@ -1885,11 +1970,15 @@ function renderRanks(){
 function openDrill(p){
   if(!p) return;
   lastFocus=lastFocus||document.activeElement;
-  const headers=p.headers||['Metric','Value'], rows=p.rows||[];
+  const linkedSource=p.source ? salesSourceRowsFor(p.source) : null;
+  const sourceAsPrimary=!!(linkedSource&&linkedSource.total&&!p.primaryIsSource);
+  const headers=sourceAsPrimary ? linkedSource.headers : (p.headers||['Metric','Value']);
+  const rows=sourceAsPrimary ? linkedSource.rows : (p.rows||[]);
+  const sourceTotal=sourceAsPrimary ? linkedSource.total : p.sourceTotal;
   $('#drillTitle').textContent=p.title||'Drill-down';
   $('#drillSummary').innerHTML=`<b>Key insight:</b> ${esc(p.summary||'This panel shows the records linked to the selected dashboard element.')}`;
   $('#drillFormula').innerHTML='';
-  const primaryLabel=p.primaryIsSource ? `${p.contextLabel||'Source rows'}${p.sourceTotal>rows.length?` (${num(rows.length)} of ${num(p.sourceTotal)})`:` (${num(rows.length)})`}` : (p.contextLabel||'Primary breakdown');
+  const primaryLabel=(p.primaryIsSource||sourceAsPrimary) ? `${p.contextLabel||sourceLabel(linkedSource?.dataset)||'Source rows'}${sourceTotal>rows.length?` (${num(rows.length)} of ${num(sourceTotal)})`:` (${num(rows.length)})`}` : (p.contextLabel||'Primary breakdown');
   const formulaBlock=p.formula?`<section class="drill-card drill-formula-card"><div class="drill-section-title">Calculation rule</div><code>${esc(p.formula)}</code></section>`:'';
   const contextInner=p.contextRows?`<div><div class="drill-section-title">Clicked-cell context</div>${tableStatic(p.contextHeaders||['Context','Value'],p.contextRows)}</div>`:'';
   const selectedInner=p.secondaryRows?`<div><div class="drill-section-title">Selected row values</div>${tableStatic(p.secondaryHeaders||['Field','Value'],p.secondaryRows)}</div>`:'';
@@ -1897,7 +1986,7 @@ function openDrill(p){
   const sourceBlock=p.sourceRows?`<section class="drill-card primary"><div class="drill-section-title">${p.contextLabel||'Source rows'}${p.sourceTotal>p.sourceRows.length?` (${num(p.sourceRows.length)} of ${num(p.sourceTotal)})`:` (${num(p.sourceRows.length)})`}</div>${tableStatic(p.sourceHeaders||['Field','Value'],p.sourceRows)}</section>`:'';
   const contextGrid=(contextInner||selectedInner)?`<section class="drill-card context-grid">${contextInner}${selectedInner}</section>`:'';
   $('#drillBody').innerHTML=`<div class="drill-layout"><div class="drill-metrics">${[
-    ['Rows',num(p.sourceTotal||rows.length)],
+    ['Rows',num(sourceTotal||rows.length)],
     ['Fields',num(headers.length)],
     ['Primary field',p.contextLabel||headers[0]||'Metric'],
     ['Calculation',p.formula?'Shown':'Context only']
