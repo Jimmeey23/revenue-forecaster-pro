@@ -204,6 +204,36 @@ function excludedMembership(name){
   return ['studiosingleclass','newcomers2for1','copperandclovessingleclass','copperclovessingleclass','copperandclovescredit','copperclovescredit'].some(x=>s.includes(x)||x.includes(s));
 }
 const paidChurnRows = (c=current()) => (c.churn||[]).filter(r=>Number(r.amount||0)>0 && !excludedMembership(r.MembershipClean));
+function aggregateRows(rows, groupIndex, init){
+  const map=new Map();
+  (rows||[]).forEach(r=>{
+    const key=String(r[groupIndex]||'Unattributed').trim()||'Unattributed';
+    if(!map.has(key)) map.set(key, init(key));
+    const out=map.get(key);
+    out.rows=(out.rows||0)+1;
+    const status=String(r[13]||'').toLowerCase();
+    const retained=String(r[14]||'').toLowerCase();
+    out.converted += /converted|won|sold|purchase/.test(status) ? 1 : 0;
+    out.retained += /retain|active|return|converted/.test(retained) ? 1 : 0;
+    out.ltv += Number(r[12]||0);
+    out.visitsPost += Number(r[9]||0);
+  });
+  return [...map.values()].map(r=>({
+    ...r,
+    newMembers:r.rows,
+    conversionRate:r.converted/Math.max(r.rows,1),
+    retentionRate:r.retained/Math.max(r.rows,1),
+    visitsPost:r.visitsPost/Math.max(r.rows,1)
+  })).sort((a,b)=>Number(b.newMembers||0)-Number(a.newMembers||0));
+}
+function fallbackSourceRows(){
+  const c=current();
+  if((c.sources||[]).length) return c.sources;
+  const ids=window.RAW_DRILL_INDEX?.index?.[`${state.period}|${state.studio}|newAll:all`]||[];
+  const rows=ids.map(i=>window.RAW_DRILL_INDEX?.rows?.newMembers?.[i]).filter(Boolean);
+  if(rows.length) return aggregateRows(rows,8,key=>({SourceClean:key, converted:0, retained:0, ltv:0, visitsPost:0}));
+  return (c.leadSources||[]).map(r=>({SourceClean:r.SourceGroup,newMembers:Number(r.trials||r.leads||0),converted:Number(r.won||0),retained:0,conversionRate:Number(r.winRate||0),retentionRate:0,ltv:Number(r.ltv||0),visitsPost:0,sourceKind:'leadSource'}));
+}
 function classUniqueMembers(cls){ return CLASS_UNIQUE_MEMBERS[`${state.period}|${state.studio}|${classOutcomeKey(cls?.Class||cls)}`] ?? null; }
 function trainerSessionDetail(name){ return TRAINER_SESSION_DETAIL[`${state.period}|${state.studio}|${name}`] || null; }
 function classOutcomeKey(name){
