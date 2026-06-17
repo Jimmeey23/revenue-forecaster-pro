@@ -65,6 +65,20 @@ const SUMMARY_SECTION_KEY_MAP = {
   funnelDetail: 'funnel-detail',
   formatDetail: 'format-detail'
 };
+const FORMULA_EXPLAINERS = {
+  gap: 'Gap %: (Current value - target or benchmark) / target or benchmark. For rate metrics the app shows percentage-point gap so fill, churn and conversion are not confused with rupee movement.',
+  mom: 'MoM: (This month - previous month) / absolute previous month. Rate metrics are shown as percentage-point movement.',
+  efficiency: 'Efficiency: schedule quality read using fill rate, class average, empty classes, late cancellations and revenue per class.',
+  risk: 'Risk: operating exposure from churn, expiries, low usage, weak fill, low conversion or negative movement; higher risk means earlier management intervention.',
+  source: 'Lead source conversion: converted first-visit members divided by first visits from the same source; if first-visit source rows are unavailable, CRM source rows are used as a fallback.',
+  move: 'Move: the recommended operating action selected from the strongest or weakest visible driver in the displayed table.',
+  fill: 'Fill %: checked-in attendance divided by available class capacity.',
+  conversion: 'Conversion %: converted clients divided by first visits or trials in the same row.',
+  retention: 'Retention %: retained clients divided by first visits or trials in the same row.',
+  churn: 'Churn risk: lapsed paid memberships divided by paid memberships expiring in the selected month.',
+  atv: 'ATV: net sales divided by transaction count.',
+  ltv: 'LTV: post-trial purchase value attributed to the new member, source or lead row.'
+};
 function summaryStorageKey(sectionKey){ return `${SUMMARY_KEY_PREFIX}:${state.period}:${state.studio}:${sectionKey}`; }
 function summarySectionKey(id){ return SUMMARY_SECTION_KEY_MAP[id] || id; }
 async function saveSummary(sectionKey, summary){
