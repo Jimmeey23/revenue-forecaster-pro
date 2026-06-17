@@ -1948,11 +1948,15 @@ function renderRanks(){
 function openDrill(p){
   if(!p) return;
   lastFocus=lastFocus||document.activeElement;
-  const headers=p.headers||['Metric','Value'], rows=p.rows||[];
+  const linkedSource=p.source ? salesSourceRowsFor(p.source) : null;
+  const sourceAsPrimary=!!(linkedSource&&linkedSource.total&&!p.primaryIsSource);
+  const headers=sourceAsPrimary ? linkedSource.headers : (p.headers||['Metric','Value']);
+  const rows=sourceAsPrimary ? linkedSource.rows : (p.rows||[]);
+  const sourceTotal=sourceAsPrimary ? linkedSource.total : p.sourceTotal;
   $('#drillTitle').textContent=p.title||'Drill-down';
   $('#drillSummary').innerHTML=`<b>Key insight:</b> ${esc(p.summary||'This panel shows the records linked to the selected dashboard element.')}`;
   $('#drillFormula').innerHTML='';
-  const primaryLabel=p.primaryIsSource ? `${p.contextLabel||'Source rows'}${p.sourceTotal>rows.length?` (${num(rows.length)} of ${num(p.sourceTotal)})`:` (${num(rows.length)})`}` : (p.contextLabel||'Primary breakdown');
+  const primaryLabel=(p.primaryIsSource||sourceAsPrimary) ? `${p.contextLabel||sourceLabel(linkedSource?.dataset)||'Source rows'}${sourceTotal>rows.length?` (${num(rows.length)} of ${num(sourceTotal)})`:` (${num(rows.length)})`}` : (p.contextLabel||'Primary breakdown');
   const formulaBlock=p.formula?`<section class="drill-card drill-formula-card"><div class="drill-section-title">Calculation rule</div><code>${esc(p.formula)}</code></section>`:'';
   const contextInner=p.contextRows?`<div><div class="drill-section-title">Clicked-cell context</div>${tableStatic(p.contextHeaders||['Context','Value'],p.contextRows)}</div>`:'';
   const selectedInner=p.secondaryRows?`<div><div class="drill-section-title">Selected row values</div>${tableStatic(p.secondaryHeaders||['Field','Value'],p.secondaryRows)}</div>`:'';
@@ -1960,7 +1964,7 @@ function openDrill(p){
   const sourceBlock=p.sourceRows?`<section class="drill-card primary"><div class="drill-section-title">${p.contextLabel||'Source rows'}${p.sourceTotal>p.sourceRows.length?` (${num(p.sourceRows.length)} of ${num(p.sourceTotal)})`:` (${num(p.sourceRows.length)})`}</div>${tableStatic(p.sourceHeaders||['Field','Value'],p.sourceRows)}</section>`:'';
   const contextGrid=(contextInner||selectedInner)?`<section class="drill-card context-grid">${contextInner}${selectedInner}</section>`:'';
   $('#drillBody').innerHTML=`<div class="drill-layout"><div class="drill-metrics">${[
-    ['Rows',num(p.sourceTotal||rows.length)],
+    ['Rows',num(sourceTotal||rows.length)],
     ['Fields',num(headers.length)],
     ['Primary field',p.contextLabel||headers[0]||'Metric'],
     ['Calculation',p.formula?'Shown':'Context only']
