@@ -1279,7 +1279,7 @@ function renderTrend(){
     const barW=Math.max((Math.max(v,0)/yMax)*plotW, 6);
     const isLatest=i===0;
     const labelText=periodLabel(ps[i]);
-    const drill=drillAttr({title:`${periodLabel(ps[i])} — ${label}`,summary:`${fmt(v)} for ${periodLabel(ps[i])}.`,headers:['Month','Value'],rows:ps.map((m,j)=>[periodLabel(m),fmt(vals[j])]),formula:formulaFor(key)});
+    const drill=`data-trend-period="${ps[i]}" tabindex="0" role="button" aria-label="Show ${periodLabel(ps[i])} item-level sales breakdown"`;
     const valueText=fmt(v);
     const valueWidth=Math.max(42, String(valueText).length*6.8);
     const valueInside=barW > Math.max(110, valueWidth + 34);
