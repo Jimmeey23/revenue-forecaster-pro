@@ -971,6 +971,8 @@ async function refreshAiReadout({force=false}={}){
     const lines=Array.isArray(data?.lines) ? data.lines.map(x=>String(x||'').trim()).filter(Boolean).slice(0,8) : [];
     if(lines.length){
       safeStore.set(readoutCacheKey(),JSON.stringify(lines));
+      clearSummaryOverrideForId('readout');
+      clearSummaryOverrideForId('cockpitSummary');
       renderReadoutLines(lines);
       renderCockpitSummary(lines);
     }
