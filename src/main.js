@@ -1788,6 +1788,9 @@ function salesDrillRows(source){
   const ids=window.SALES_DRILL_INDEX.index?.[`${state.period}|${state.studio}|${source.kind}:${source.value}`]||[];
   return ids.map(i=>window.SALES_DRILL_INDEX.rows[i]).filter(Boolean);
 }
+function sourceLabel(dataset){
+  return ({sales:'Source transactions',sessions:'Raw session rows',newMembers:'Raw new-member rows',leads:'Raw CRM lead rows',lapsed:'Raw lapsed-member rows'})[dataset] || 'Source rows';
+}
 function drillSourceDataset(source){
   const salesKinds=new Set(['all','category','product','member','seller','purchaseTag']);
   if(salesKinds.has(source?.kind)) return 'sales';
