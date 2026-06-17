@@ -1003,9 +1003,11 @@ function tableInsightCacheKey(tableId,snapshot){
 function setTableInsight(summaryId,text){
   const el=document.getElementById(summaryId);
   if(!el) return;
+  if(loadSavedSummary(summarySectionKey(summaryId))) { makeEditableSummary(el); return; }
   const insight=normalizeGeneratedInsight(text);
   const body=insight.replace(/^key insight:\s*/i,'');
   el.innerHTML=`<b>Key insight:</b> ${esc(body)}`;
+  makeEditableSummary(el);
 }
 function queueTableInsight(summaryId, tableId, title, fallback){
   const summaryEl=document.getElementById(summaryId);
@@ -1044,6 +1046,7 @@ async function refreshTableInsights(){
       const data=await res.json();
       const insight=normalizeGeneratedInsight(data?.insight||job.fallback);
       safeStore.set(job.cacheKey,insight);
+      clearSummaryOverrideForId(job.summaryId);
       setTableInsight(job.summaryId,insight);
     }catch(e){
       if(e.name==='AbortError') return;
