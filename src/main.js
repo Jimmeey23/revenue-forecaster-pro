@@ -1059,11 +1059,11 @@ function periodsFrom(startKey){
 }
 function trendFmt(key){ return v=>key.includes('Rate')?pct(v):(key==='revenuePerVisit'||key.includes('Rev')||key==='revenuePerClass'||key==='newRevenue'||key==='renewedRevenue')?money(v):(key==='classAvg')?one(v):num(v); }
 function openPeriodDrillPanel(payload){
-  const {title,summary,headers,rows,body}=payload;
+  const {title,summary,headers,rows,body,formula}=payload;
   lastFocus=lastFocus||document.activeElement;
   $('#drillTitle').textContent=title||'';
   $('#drillSummary').innerHTML=summary?`<b>Context:</b> ${esc(summary)}`:'';
-  $('#drillFormula').innerHTML='';
+  $('#drillFormula').innerHTML=formula?`<section class="drill-card drill-formula-card"><div class="drill-section-title">Calculation rule</div><code>${esc(formula)}</code></section>`:'';
   if(body){
     $('#drillBody').innerHTML=body;
   } else {
@@ -1117,6 +1117,7 @@ function openTrendPeriodDrill(period){
   ]);
 
   const tagRows=purchaseTags.map(r=>[trunc(r.PurchaseTag||'-',24),money(r.revenue||0),num(r.buyers||0),num(r.items||0)]);
+  const tx=salesSourceRowsFor({kind:'all',value:'sales'},50,period,state.studio);
 
   const summaryRows=[
     ['Period',periodLabel(period)],
@@ -1146,13 +1147,14 @@ function openTrendPeriodDrill(period){
 
   const bodyHtml=`
     ${sectionHtml('Revenue Summary', ['Metric','Value'], summaryRows)}
+    ${tx.total ? sectionHtml(`Actual transaction rows (${num(tx.rows.length)} of ${num(tx.total)})`, tx.headers, tx.rows) : ''}
     ${tagRows.length ? sectionHtml('Revenue by Purchase Tag', ['Tag','Revenue','Buyers','Units'], tagRows) : ''}
     ${membershipTableRows.length ? sectionHtml('Membership Churn & Revenue', membershipTableHeaders, membershipTableRows) : ''}
     ${categoryTableRows.length ? sectionHtml('Sales Category Mix', categoryTableHeaders, categoryTableRows) : ''}
     ${productTableRows.length ? sectionHtml('Product Revenue', productTableHeaders, productTableRows) : ''}
   `;
 
-  openPeriodDrillPanel({title, summary, headers:['Metric','Value'], rows:summaryRows, body:bodyHtml});
+  openPeriodDrillPanel({title, summary, headers:['Metric','Value'], rows:summaryRows, body:bodyHtml, formula:FORMULA_EXPLAINERS.atv});
 }
 function openMixPeriodDrill(period){
   const pd=APP.data[period]?.[state.studio];
@@ -1196,6 +1198,7 @@ function openMixPeriodDrill(period){
     num(r.sessions), num(r.attendance), one(r.avg), pct(r.fill),
     num(r.late), money(r.revenue)
   ]);
+  const raw=salesSourceRowsFor({kind:'sessionAll',value:'all'},50,period,state.studio);
 
   const sectionHtml=(heading, headers, rows)=>{
     if(!rows.length) return '';
@@ -1204,13 +1207,14 @@ function openMixPeriodDrill(period){
 
   const bodyHtml=`
     ${sectionHtml('Schedule Summary',['Metric','Value'],summaryRows)}
+    ${raw.total ? sectionHtml(`Actual session rows (${num(raw.rows.length)} of ${num(raw.total)})`, raw.headers, raw.rows) : ''}
     ${sectionHtml('Class Breakdown — '+cfg.label, classHeaders, classRows)}
   `;
 
   openPeriodDrillPanel({
     title:`${periodLabel(period)} — ${cfg.label} Breakdown`,
     summary:`${periodLabel(period)}: ${cfg.fmt(mode==='fillRate'?Number(s.fillRate||0):mode==='classAvg'?Number(s.classAvg||0):mode==='emptyClasses'?Number(s.emptyClasses||0):mode==='sessions'?Number(s.classes||0):mode==='visits'?Number(s.checkedIn||0):mode==='lateCancels'?Number(s.lateCancels||0):0)} ${cfg.label.toLowerCase()}. ${num(s.classes||0)} sessions across ${num((pd.classes||[]).length)} class types.`,
-    headers:['Metric','Value'], rows:summaryRows, body:bodyHtml
+    headers:['Metric','Value'], rows:summaryRows, body:bodyHtml, formula:FORMULA_EXPLAINERS.efficiency
   });
 }
 function selectedTrendPeriod(){
