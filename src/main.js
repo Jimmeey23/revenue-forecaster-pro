@@ -1333,7 +1333,7 @@ function renderTrendSummary(){
   // direction language
   const isNegativeMetric=key==='lateCancels'||key==='emptyClasses'||key==='churnedMemberships'||key==='churnRate';
   const trend=last>=avg ? (isNegativeMetric ? 'above average — watch this closely' : 'above the period average — a positive signal') : (isNegativeMetric ? 'below average — healthy' : 'below the period average — monitor for recovery');
-  $('#trendSummary').innerHTML=`<b>${label}</b> is <b>${fmt(last)}</b> this month — ${trend}. <span class="trend-mom">${momText}</span> <span class="trend-yoy">${yoyText}</span>`;
+  $('#trendSummary').innerHTML=`<b>${label}</b> is <b>${fmt(last)}</b> this month — ${trend}. <span class="trend-mom">${momText}</span> <span class="trend-yoy">${yoyText}</span><span class="formula-inline">${esc(FORMULA_EXPLAINERS.mom)}</span>`;
   const s=current().summary;
   if(key==='salesRev'){
     $('#trendDetail').innerHTML='';
@@ -1441,7 +1441,7 @@ function renderMixChart(){
   <text class="trend-baseline-label" x="${w-padR-89}" y="${h-21}" text-anchor="middle">period avg ${trendFmtFn(avg)}</text>
 </svg>`;
 
-  $('#mixChartSummary').innerHTML=`<b>${cfg.label}:</b> ${cfg.summary} across all periods. Click any bar to see the class breakdown for that month.`;
+  $('#mixChartSummary').innerHTML=`<b>${cfg.label}:</b> ${cfg.summary} across all periods. Click any bar to see the actual session rows and class breakdown for that month. <span class="formula-inline">${esc(mode==='fillRate'?FORMULA_EXPLAINERS.fill:FORMULA_EXPLAINERS.efficiency)}</span>`;
   $('#mixChartDetail').innerHTML=detailTiles([[cfg.label,trendFmtFn(vals.at(-1))],['Periods shown',num(ps.length)],['Period avg',trendFmtFn(avg)],['Action',cfg.action]]);
   renderNextThirtyFocus();
   renderMixSideSummary(cfg, (c.classes||[]).map(r=>({name:r.Class,format:r.Format,value:Number(r[cfg.key]||0),fill:Number(r.fill||0),revenue:Number(r.revenue||0),classes:Number(r.classes||0)})).sort((a,b)=>b.value-a.value).slice(0,7));
