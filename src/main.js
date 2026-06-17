@@ -24,7 +24,8 @@ const htmlCell = v => {
 };
 const safeStore = {
   get(key){ try { return localStorage.getItem(key); } catch { return null; } },
-  set(key,value){ try { localStorage.setItem(key,value); } catch {} }
+  set(key,value){ try { localStorage.setItem(key,value); } catch {} },
+  remove(key){ try { localStorage.removeItem(key); } catch {} }
 };
 const SUMMARY_KEY_PREFIX = 'p57-summary:v1';
 const SUMMARY_SECTIONS = [
@@ -81,6 +82,8 @@ const FORMULA_EXPLAINERS = {
 };
 function summaryStorageKey(sectionKey){ return `${SUMMARY_KEY_PREFIX}:${state.period}:${state.studio}:${sectionKey}`; }
 function summarySectionKey(id){ return SUMMARY_SECTION_KEY_MAP[id] || id; }
+function clearSavedSummary(sectionKey){ safeStore.remove(summaryStorageKey(sectionKey)); }
+function clearSummaryOverrideForId(id){ clearSavedSummary(summarySectionKey(id)); }
 async function saveSummary(sectionKey, summary){
   safeStore.set(summaryStorageKey(sectionKey), summary);
   try {
