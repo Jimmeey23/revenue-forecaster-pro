@@ -675,7 +675,10 @@ function makeEditableSummary(el){
   });
   btn.addEventListener('click', (event) => {
     event.stopPropagation();
-    const currentText = plainText(el.querySelector('.summary-copy')?.textContent || el.textContent).replace(/Edited\s*Reset to AI\s*$/,'').trim();
+    const clone=el.cloneNode(true);
+    clone.querySelector('.summary-toolbar')?.remove();
+    clone.querySelector('.summary-edited-chip')?.remove();
+    const currentText = plainText(el.querySelector('.summary-copy')?.textContent || clone.textContent).trim();
     const original = el.innerHTML;
     el.innerHTML = `<div class="summary-editor"><textarea rows="5">${esc(currentText)}</textarea><div class="summary-editor-actions"><button type="button" class="summary-save-btn">Save</button><button type="button" class="summary-cancel-btn">Cancel</button></div></div>`;
     const textarea=el.querySelector('textarea');
