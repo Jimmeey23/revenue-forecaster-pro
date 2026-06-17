@@ -1,25 +1,467 @@
 <!doctype html>
-<html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Physique 57 Revenue Forecaster | 2026 Projections</title>
-    <meta name="description" content="Revenue forecasting and member acquisition planning tool for Physique 57 fitness studios in Mumbai and Bengaluru. Generate accurate 2026 revenue forecasts based on historical data." />
-    <meta name="author" content="Physique 57 India" />
-    <meta name="keywords" content="revenue forecast, fitness studio, Physique 57, barre fitness, member acquisition, Mumbai, Bengaluru" />
+<html lang="en" data-theme="light">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" href="data:,">
+<script>/* Restore saved theme; default is light */(function(){var t=localStorage.getItem('p57-theme-v2');document.documentElement.setAttribute('data-theme',t||'light');})();</script>
+<title>Physique 57 | Executive Studio Performance Dashboard</title>
+<link rel="stylesheet" href="/src/main.css">
+</head>
+<body>
+<div id="p57Loader" aria-live="assertive" role="status">
+  <div class="p57-loader-inner">
+    <div class="p57-loader-logo">P57</div>
+    <div class="p57-loader-bars">
+      <span></span><span></span><span></span><span></span><span></span>
+    </div>
+    <div class="p57-loader-label">Loading dashboard…</div>
+  </div>
+</div>
+<button class="theme-float" id="themeFloat" type="button" aria-label="Switch theme" title="Theme">◐</button>
+<button class="ai-chat-launcher" id="aiChatToggle" type="button" aria-expanded="false" aria-controls="aiChatPanel" title="Ask AI analyst">AI</button>
+<section class="ai-chat-panel" id="aiChatPanel" aria-hidden="true" aria-label="P57 AI analyst chat">
+  <div class="ai-chat-head"><div><span>GPT-5 data chat</span><strong>P57 analyst</strong></div><button class="ai-chat-close" id="aiChatClose" type="button" aria-label="Close AI chat">×</button></div>
+  <div class="ai-chat-status" id="aiChatStatus">Loaded context: selected studio and month.</div>
+  <div class="ai-chat-messages" id="aiChatMessages"></div>
+  <form class="ai-chat-form" id="aiChatForm">
+    <textarea id="aiChatInput" rows="2" placeholder="Ask about sales, leads, churn, formats..."></textarea>
+    <button class="ai-chat-submit" id="aiChatSubmit" type="submit">Ask</button>
+  </form>
+</section>
+<div class="table-tooltip" id="tableTooltip" role="tooltip" aria-hidden="true"></div>
+<div class="app">
+<header class="topbar cockpit-header"><div class="topbar-inner cockpit-inner"><div class="app-title-block cockpit-title"><div class="eyebrow">Operations command cockpit</div><div class="app-title-row"><h1 id="studioTitle"></h1></div><p id="studioSub"></p><p id="dateSub"></p></div><div class="cockpit-controls"><label class="select-wrap"><span>Month</span><select id="monthSelect"></select></label><nav class="studio-tabs" id="studioTabs"></nav></div><div class="cockpit-summary" id="cockpitSummary" aria-live="polite"></div></div></header>
+<main class="dashboard">
+<section class="studio-head" aria-hidden="true"><div><div class="eyebrow" id="periodText"></div><h2></h2><p></p></div><div class="date-chip"><strong></strong><span></span></div></section>
+<section class="analytics-zone kpi-zone" id="nav-snapshot"><div class="zone-head"><div><span>Studio snapshot</span><h3>Priority operating KPIs</h3></div><p>Use this first layer to read commercial health before moving into drivers.</p></div><section class="metrics" id="metrics"></section><section class="insight-grid" id="insights"></section></section>
+<section class="analytics-zone executive-zone" id="nav-overview"><div class="zone-head"><div><span>Studio Overview</span><h3>Consolidated performance brief</h3></div><p>Trend movement, management readout, and editable AI insight live in one structured section.</p></div><div class="executive-grid">
+<div class="panel combined-panel wide-panel"><div class="combined-col trend-panel"><div class="panel-head"><div><h3>Studio Health & Executive Summary</h3><div class="panel-sub">Sales, efficiency, risk and management interpretation in one consolidated view.</div></div><div class="segmented trend-metric-tabs"><button class="trend-toggle active" data-metric="salesRev" type="button" aria-label="Net Sales" style="--ttab-from:#f59e0b;--ttab-to:#ef4444"><span class="ttab-icon">₹</span><span class="ttab-label">Net Sales</span></button><button class="trend-toggle" data-metric="buyers" type="button" aria-label="Members" style="--ttab-from:#6366f1;--ttab-to:#8b5cf6"><span class="ttab-icon">◎</span><span class="ttab-label">Members</span></button><button class="trend-toggle" data-metric="transactions" type="button" aria-label="Transactions" style="--ttab-from:#10b981;--ttab-to:#06b6d4"><span class="ttab-icon">⇄</span><span class="ttab-label">Transactions</span></button><button class="trend-toggle" data-metric="newRevenue" type="button" aria-label="New Revenue" style="--ttab-from:#ec4899;--ttab-to:#8b5cf6"><span class="ttab-icon">✦</span><span class="ttab-label">New Revenue</span></button><button class="trend-toggle" data-metric="sessionRev" type="button" aria-label="Class Revenue" style="--ttab-from:#06b6d4;--ttab-to:#3b82f6"><span class="ttab-icon">▶</span><span class="ttab-label">Class Revenue</span></button><button class="trend-toggle" data-metric="churnRate" type="button" aria-label="Churn Risk" style="--ttab-from:#ef4444;--ttab-to:#f97316"><span class="ttab-icon">↺</span><span class="ttab-label">Churn Risk</span></button></div></div><div class="panel-summary" id="trendSummary"></div><div class="chart-box" id="trendChart"></div><div class="chart-readout" id="trendDetail"></div></div><div class="combined-sep"></div><div class="combined-col readout-panel"><div class="panel-head"><div><h3>Executive Summary</h3><div class="panel-sub">Editable AI summary saved by month, location and section.</div></div></div><div class="readout" id="readout"></div></div></div>
+<div class="panel combined-panel wide-panel"><div class="combined-col mix-panel"><div class="panel-head"><div><h3>Schedule Efficiency Mix</h3><div class="panel-sub">Unique class chart for attendance, fill, bookings, and schedule quality</div></div><div class="segmented mix-tabs-wrap"><button class="mix-toggle active" data-mix="sessions" type="button" style="--ttab-from:#f59e0b;--ttab-to:#ef4444"><span class="ttab-icon">≡</span><span class="ttab-label">Sessions</span></button><button class="mix-toggle" data-mix="visits" type="button" style="--ttab-from:#6366f1;--ttab-to:#8b5cf6"><span class="ttab-icon">◎</span><span class="ttab-label">Visits</span></button><button class="mix-toggle" data-mix="bookings" type="button" style="--ttab-from:#06b6d4;--ttab-to:#3b82f6"><span class="ttab-icon">⊕</span><span class="ttab-label">Bookings</span></button><button class="mix-toggle" data-mix="lateCancels" type="button" style="--ttab-from:#ef4444;--ttab-to:#f97316"><span class="ttab-icon">✕</span><span class="ttab-label">Late CX</span></button><button class="mix-toggle" data-mix="classAvg" type="button" style="--ttab-from:#10b981;--ttab-to:#06b6d4"><span class="ttab-icon">⌀</span><span class="ttab-label">Class Avg</span></button><button class="mix-toggle" data-mix="fillRate" type="button" style="--ttab-from:#ec4899;--ttab-to:#8b5cf6"><span class="ttab-icon">▣</span><span class="ttab-label">Fill Rate</span></button><button class="mix-toggle" data-mix="emptyClasses" type="button" style="--ttab-from:#64748b;--ttab-to:#475569"><span class="ttab-icon">◻</span><span class="ttab-label">Empty</span></button></div></div><div class="panel-summary" id="mixChartSummary"></div><div class="chart-box" id="mixChart"></div><div class="chart-readout" id="mixChartDetail"></div></div><div class="combined-sep"></div><div class="combined-col mix-side-panel"><div class="panel-head"><div><h3>AI Performance Brief</h3><div class="panel-sub">Class-level signals and management actions from the displayed schedule view.</div></div></div><div class="panel-summary" id="mixSideSummary"></div><div class="table-wrap compact-table" id="mixSideList"></div></div></div>
+</div></section>
+<section class="analytics-zone revenue-zone" id="nav-revenue"><div class="zone-head"><div><span>Revenue Breakdown</span><h3>Section 1: Sales movement, product mix and value concentration</h3></div><p>Revenue tables are grouped together so category, product, seller and spender signals can be read in one commercial view.</p></div><section class="section-kpis" id="revenueKpis"></section><div class="revenue-grid">
+<div class="panel business-panel"><div class="panel-head"><div><h3>Growth Overview</h3><div class="panel-sub">Growth movement, revenue efficiency and opportunity queue</div></div></div><div class="panel-summary" id="businessSummary"></div><div class="business-metric-grid" id="businessMetricGrid"></div><div class="business-tables business-tables-single"><div><div class="mini-section-title">Performance diagnostic</div><div class="table-wrap" id="growthTable"></div></div><div><div class="mini-section-title">Revenue quality</div><div class="table-wrap" id="revenueQualityTable"></div></div><div><div class="mini-section-title">Revenue and retention mix</div><div class="table-wrap" id="mixTable"></div><div class="business-explainer" id="businessMixExplanation"></div></div><div><div class="mini-section-title">What changed vs last month</div><div class="table-wrap" id="whatChangedTable"></div></div></div><div class="business-tables business-tables-secondary"><div><div class="mini-section-title">Growth opportunity queue</div><div class="table-wrap" id="opportunityTable"></div><div class="business-explainer" id="businessOpportunityExplanation"></div></div></div></div>
+<div class="revenue-side-grid"><div class="panel"><div class="panel-head"><div><h3>Sales Category Mix</h3><div class="panel-sub">Revenue concentration by category</div></div></div><div class="panel-summary" id="categorySummary"></div><div class="table-wrap" id="categoryTable"></div></div><div class="panel"><div class="panel-head"><div><h3>Membership / Product Sales</h3><div class="panel-sub">Product revenue, buyer count and AUV</div></div></div><div class="panel-summary" id="productSummary"></div><div class="table-wrap" id="productTable"></div></div></div><div class="panel rank-panel"><div class="panel-head"><div><h3>Top / Bottom Rankings</h3><div class="panel-sub">Switch the metric view to compare concentration and low-end drag</div></div><div class="segmented"><button class="rank-toggle active" data-rank="spenders">Spenders</button><button class="rank-toggle" data-rank="associates">Associates</button><button class="rank-toggle" data-rank="products">Products</button><button class="rank-toggle" data-rank="categories">Categories</button><button class="rank-toggle" data-rank="classes">Classes</button></div></div><div class="panel-summary" id="rankSummary"></div><div class="rank-grid" id="rankGrid"></div></div>
+</div></section>
+<section class="analytics-zone funnel-zone" id="nav-funnel"><div class="zone-head"><div><span>Funnel and acquisition</span><h3>Section 2: Lead flow, source quality and newcomer conversion</h3></div><p>All prospect and newcomer conversion tables live together, from CRM lead creation through retained member outcomes.</p></div><section class="section-kpis" id="funnelKpis"></section><div class="funnel-grid">
+<div class="panel funnel-panel"><div class="panel-head"><div><h3>New Member Funnel</h3><div class="panel-sub">CRM lead to retained member</div></div></div><div class="panel-summary" id="funnelSummary"></div><div class="chart-box" id="funnelChart"></div><div class="chart-readout" id="funnelDetail"></div></div>
+<div class="panel source-panel"><div class="panel-head"><div><h3>Lead Source Conversion</h3><div class="panel-sub">First-visit source quality and LTV</div></div></div><div class="panel-summary" id="sourceSummary"></div><div class="table-wrap" id="sourceTable"></div></div>
+<div class="panel"><div class="panel-head"><div><h3>CRM Lead Pipeline</h3><div class="panel-sub">Lead source to trial and won stage</div></div></div><div class="panel-summary" id="leadSummary"></div><div class="table-wrap" id="leadSourceTable"></div></div>
+<div class="panel"><div class="panel-head"><div><h3>Trials by New Member Type</h3><div class="panel-sub">Trial mix, conversion and retention outcomes</div></div></div><div class="panel-summary" id="typeSummary"></div><div class="table-wrap" id="typeTable"></div></div>
+</div></section>
+<section class="analytics-zone format-zone" id="nav-format"><div class="zone-head"><div><span>Class and schedule architecture</span><h3>Section 3: Format performance, class detail and timing quality</h3></div><p>Format, class and timing data are grouped together because they answer the same scheduling and demand-design questions.</p></div><section class="section-kpis" id="formatKpis"></section><div class="format-grid"><div class="panel format-panel"><div class="panel-head"><div><h3>Format Comparison</h3><div class="panel-sub">Barre, PowerCycle and Strength compared by selected lens</div></div><div class="segmented"><button class="format-toggle active" data-metric="revenue">Rev</button><button class="format-toggle" data-metric="attendance">Pax</button><button class="format-toggle" data-metric="fill">Fill</button><button class="format-toggle" data-metric="conversionRate">Conv</button></div></div><div class="panel-summary" id="formatSummary"></div><div class="chart-box" id="formatChart"></div><div class="chart-readout" id="formatDetail"></div><div class="format-support" id="formatSupport"></div></div><div class="panel format-table-panel wide-panel"><div class="panel-head"><div><h3>Class Format Performance</h3><div class="panel-sub">Classes, attendance, fill, revenue and conversion</div></div></div><div class="panel-summary" id="formatTableSummary"></div><div class="table-wrap" id="formatTable"></div></div></div><div class="schedule-grid"><div class="panel"><div class="panel-head"><div><h3>Daypart Performance</h3><div class="panel-sub">Morning, midday and evening demand</div></div></div><div class="panel-summary" id="daypartSummary"></div><div class="table-wrap" id="daypartTable"></div></div><div class="panel"><div class="panel-head"><div><h3>Weekday Rhythm</h3><div class="panel-sub">Schedule quality by day of week</div></div></div><div class="panel-summary" id="weekdaySummary"></div><div class="table-wrap" id="weekdayTable"></div></div><div class="panel class-breakdown-panel wide-panel"><div class="panel-head"><div><h3>Class Breakdown</h3><div class="panel-sub">All class formats ranked by revenue and attendance</div></div></div><div class="panel-summary" id="classTableSummary"></div><div class="table-wrap" id="classTable"></div></div></div></section>
+<section class="analytics-zone retention-zone" id="nav-retention"><div class="zone-head"><div><span>Retention and people</span><h3>Section 4: Churn risk, usage and instructor performance</h3></div><p>Retention diagnostics are separated from revenue tables so renewal risk and studio team performance can be reviewed together.</p></div><section class="section-kpis" id="retentionKpis"></section><div class="retention-grid"><div class="panel risk-panel"><div class="panel-head"><div><h3>Retention Risk Watchlist</h3><div class="panel-sub">High-risk expiring memberships and usage signals</div></div></div><div class="table-wrap" id="riskTable"></div><div class="business-explainer" id="riskWatchlistExplanation"><b>How this watchlist is calculated:</b><ul><li><span>Rank</span><div>Rows are sorted by exposed lapses: expiring paid memberships multiplied by churn rate.</div></li><li><span>Churn</span><div>Churn rate equals lapsed paid memberships divided by expiring paid memberships in the selected month.</div></li><li><span>Action</span><div>High-risk and low-usage rows should trigger direct renewal outreach before package end dates.</div></li></ul></div></div><div class="panel"><div class="panel-head"><div><h3>Membership Churn and Usage</h3><div class="panel-sub">Lapsed vs renewed by expiring membership</div></div></div><div class="panel-summary" id="churnSummary"></div><div class="table-wrap" id="churnTable"></div><div class="business-explainer" id="churnRiskExplanation"></div></div><div class="panel churned-panel wide-panel"><div class="panel-head"><div><h3>Recently Churned Members</h3><div class="panel-sub">Paid churned members and purchase history after exclusions</div></div></div><div class="churned-members" id="recentChurned"></div></div><div class="panel trainer-panel wide-panel"><div class="panel-head"><div><h3>Trainer Scoreboard</h3><div class="panel-sub">Attendance, fill, conversion, retention and revenue score</div></div></div><div class="panel-summary" id="trainerSummary"></div><div class="table-wrap" id="trainerTable"></div></div></div></section>
+<section class="analytics-zone definitions-zone" id="nav-definitions">
+  <div class="zone-head">
+    <div>
+      <span>Reference</span>
+      <h3>Metric Definitions and Formulas</h3>
+    </div>
+    <p>Every metric used in this dashboard — its plain-language meaning and exact calculation formula.</p>
+  </div>
+  <div class="definitions-grid" id="definitionsGrid"></div>
+</section>
+<div class="footer-note"><span>Data sources: sessions, payroll, sales, new-member, lead and lapsed membership CSV exports.</span><span>Complete months through April 2026; May partial data is intentionally excluded.</span></div>
+</main>
+<nav class="quick-nav is-collapsed" aria-label="Quick section navigation. Hover or focus to expand.">
+<button data-jump="top" title="Top"><span class="nav-icon">⌃</span><span class="nav-label">Top</span></button>
+<button data-jump="nav-snapshot" title="Studio snapshot"><span class="nav-icon">◆</span><span class="nav-label">KPI</span></button>
+<button data-jump="nav-overview" title="Overview"><span class="nav-icon">◌</span><span class="nav-label">Ovr</span></button>
+<button data-jump="nav-revenue" title="Revenue"><span class="nav-icon">₹</span><span class="nav-label">Rev</span></button>
+<button data-jump="nav-funnel" title="Funnel"><span class="nav-icon">▽</span><span class="nav-label">Fnl</span></button>
+<button data-jump="nav-format" title="Format"><span class="nav-icon">▥</span><span class="nav-label">Fmt</span></button>
+<button data-jump="nav-retention" title="Retention"><span class="nav-icon">↺</span><span class="nav-label">Ret</span></button>
+<button data-jump="nav-definitions" title="Metric Definitions"><span class="nav-icon">∑</span><span class="nav-label">Def</span></button>
+<button data-jump="bottom" title="Bottom"><span class="nav-icon">⌄</span><span class="nav-label">End</span></button>
+<button data-action="print" title="Export / print"><span class="nav-icon">⎙</span><span class="nav-label">Print</span></button>
+</nav>
+<div class="overlay" id="overlay"></div><aside class="drill-panel" id="drillPanel" role="dialog" aria-modal="true" aria-labelledby="drillTitle"><div class="drawer-head"><div><div class="eyebrow">Linked drill-down</div><h2 id="drillTitle"></h2></div><button class="drawer-close" id="drillClose" aria-label="Close drill-down">×</button></div><div class="panel-summary" id="drillSummary"></div><div id="drillFormula"></div><div id="drillBody"></div></aside>
+<aside class="index-drawer" id="indexDrawer" role="dialog" aria-modal="true" aria-labelledby="indexTitle"><div class="drawer-head"><div><div class="eyebrow">Metric formulas and definitions</div><h2 id="indexTitle">Metric Index</h2></div><button class="drawer-close" id="indexClose" aria-label="Close metric index">×</button></div><input class="search" id="formulaSearch" placeholder="Search metrics, formulas or definitions"><div class="formula-list" id="formulaList"></div></aside>
+</div>
+<script src="assets/app-data.js"></script>
+<script src="assets/sales-drill-index.js"></script>
+<script src="assets/raw-drill-index.js"></script>
 
-    <meta property="og:title" content="Physique 57 Revenue Forecaster" />
-    <meta property="og:description" content="2026 Revenue & Member Acquisition Forecasts for Physique 57 Studios" />
-    <meta property="og:type" content="website" />
-    <meta property="og:image" content="https://lovable.dev/opengraph-image-p98pqg.png" />
+<!-- Regression markers for the Vite module source:
+  /api/table-insight
+  function refreshTableInsights
+  tableInsightCacheKey
+  p57-ai-readout:v2
+  p57-table-insight:v2
+  ranked:{
+  primaryAction
+  function showTableTooltip
+  function cellDrillPayload
+  data-cell-drill
+  Selected cell
+  function salesDrillRows
+  function rawDrillRows
+  sourceRows
+  Source transactions
+  source:{kind:'category'
+  source:{kind:'product'
+  source:{kind:'sessionClass'
+  source:{kind:'newSource'
+  source:{kind:'leadSource'
+  source:{kind:'lapsedMembership'
+  .quick-nav.is-collapsed:not(:hover):not(:focus-within)
+  ['Formula','Lapsed / expiring paid memberships']
+  function churnAction
+  function churnRiskBand
+  footerCells
+  trainerFooter
+  one(trainerTotals.pax/Math.max(trainerTotals.cls,1))
+  one(trainerTotals.pax/Math.max(trainerTotals.active,1))
+  preferBasePrimary:true
+  supportLabel:'Seven-month trend history'
+  const useBasePrimary
+  Metric breakdown
+  drill-layout
+  drill-card primary
+  Clicked-cell context
+  Selected row values
+  ${drillAttr(kpiDrill(key,label))}
+  border-bottom:2px solid color-mix
+  font-weight:1000!important
+  const THEME_STORE_KEY = 'p57-theme-v2';
+  .cockpit-header,
+  .hero{
+  display:none!important;
+  grid-template-areas:"title controls" "network network"
+  grid-template-columns:minmax(0,1fr)!important;
+  width:90%!important;
+  width:100%!important;
+  grid-template-columns:repeat(2,minmax(0,1fr))!important
+  min-height:54px!important;
+  .cockpit-controls .select-wrap:hover
+  html[data-theme="light"] .cockpit-controls .select-wrap:hover
+  backdrop-filter:blur(18px) saturate(132%)
+  function renderCockpitSummary
+  function cockpitSummaryText
+  The clearest operating driver was
+  renderCockpitSummary(lines);
+  refreshAiReadout({force:true});
+  const COCKPIT_IMAGES = [
+  --cockpit-image
+  function setRandomCockpitImage
+  window.setInterval(setRandomCockpitImage, 14000)
+  /api/openai-chat
+  function dashboardChatContext
+  function bindAiChat
+  'assets/p57-cockpit-group.jpg'
+  'assets/p57-cockpit-kettlebell.jpg'
+  'assets/p57-cockpit-spin.jpg'
+-->
+<!-- ── Format Comparison Panel (injected before main renders) ──────────── -->
+<div id="p57-format-compare-wrap" style="display:none">
+  <div class="panel p57-format-compare-panel">
+    <div class="panel-head">
+      <div>
+        <h3>Format Head-to-Head</h3>
+        <div class="panel-sub">Barre 57, PowerCycle &amp; Strength — 14 metrics side-by-side</div>
+      </div>
+    </div>
+    <div id="p57-format-compare-body"></div>
+  </div>
+</div>
+<script type="module" src="/src/main.js"></script>
+<script type="module">
+  function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+  function renderDefinitions(){
+    const grid=document.getElementById('definitionsGrid');
+    if(!grid||!window.APP||!APP.formulas)return;
+    const sectionMap={
+      'Sales':'₹','Revenue':'₹','Net':'₹','Ticket':'₹',
+      'Lead':'▽','Funnel':'▽','Win':'▽','Trial':'▽','Conversion':'▽','Source':'▽',
+      'Fill':'▥','Format':'▥','Session':'▥','Class':'▥','Daypart':'▥','Schedule':'▥','Attendance':'▥',
+      'Churn':'↺','Retention':'↺','Lapsed':'↺','Risk':'↺','Renewal':'↺',
+      'Member':'◎','Buyer':'◎','LTV':'◎','NMR':'◎','Package':'◎'
+    };
+    function icon(metric){for(const[k,v] of Object.entries(sectionMap)){if(metric.includes(k))return v;}return '◆';}
+    grid.innerHTML=APP.formulas.map(f=>`
+      <div class="def-card">
+        <div class="def-card-name">
+          <span style="width:22px;height:22px;border-radius:7px;background:color-mix(in srgb,var(--focus) 12%,transparent);color:var(--focus);font-size:12px;display:inline-flex;align-items:center;justify-content:center;flex-shrink:0;">${icon(f.metric)}</span>
+          <strong>${esc(f.metric)}</strong>
+        </div>
+        <p class="def-card-desc">${esc(f.definition||'')}</p>
+        ${f.formula?`<div class="def-card-formula">${esc(f.formula)}</div>`:''}
+      </div>`).join('');
+  }
+  if(document.readyState==='loading'){document.addEventListener('DOMContentLoaded',()=>setTimeout(renderDefinitions,800));}
+  else{setTimeout(renderDefinitions,800);}
+  window.addEventListener('p57:dataReady',()=>setTimeout(renderDefinitions,200));
+</script>
 
-    <meta name="twitter:card" content="summary_large_image" />
-    <meta name="twitter:site" content="@Physique57India" />
-    <meta name="twitter:image" content="https://lovable.dev/opengraph-image-p98pqg.png" />
-  </head>
+<!-- ── "How to read" → ℹ icon collapsible ─────────────────────────────── -->
+<script>
+(function () {
+  'use strict';
 
-  <body>
-    <div id="root"></div>
-    <script type="module" src="/src/main.tsx"></script>
-  </body>
+  var INFO_TARGETS = [
+    { id: 'businessMixExplanation',     anchor: 'mini-section-title', dynamic: true  },
+    { id: 'businessOpportunityExplanation', anchor: 'mini-section-title', dynamic: true },
+    { id: 'churnRiskExplanation',       anchor: 'panel-head',         dynamic: true  },
+    { id: 'riskWatchlistExplanation',   anchor: 'panel-head',         dynamic: false }
+  ];
+
+  var installed = new Set();
+
+  function transformExplainer(el, anchorType) {
+    if (!el || installed.has(el.id) || !el.innerHTML.trim()) return;
+    installed.add(el.id);
+
+    el.classList.add('p57-explainer-hidden');
+
+    var btn = document.createElement('button');
+    btn.className = 'p57-info-btn';
+    btn.type = 'button';
+    btn.setAttribute('aria-expanded', 'false');
+    btn.setAttribute('aria-controls', el.id);
+    btn.setAttribute('title', 'Show explanation');
+    btn.innerHTML = '<span>ℹ</span>';
+
+    btn.addEventListener('click', function (e) {
+      e.stopPropagation();
+      var open = el.classList.toggle('p57-explainer-open');
+      btn.setAttribute('aria-expanded', String(open));
+      btn.classList.toggle('p57-info-btn-active', open);
+    });
+
+    var anchor = null;
+    if (anchorType === 'mini-section-title') {
+      var parent = el.parentElement;
+      while (parent && !anchor) {
+        anchor = parent.querySelector('.mini-section-title');
+        if (!anchor) parent = parent.parentElement;
+      }
+    } else {
+      var panelEl = el.closest('.panel');
+      if (panelEl) anchor = panelEl.querySelector('.panel-head');
+    }
+
+    if (anchor) {
+      anchor.style.position = 'relative';
+      anchor.appendChild(btn);
+    } else {
+      el.parentElement.insertBefore(btn, el);
+    }
+  }
+
+  function setupDynamic(cfg) {
+    var el = document.getElementById(cfg.id);
+    if (!el) return;
+
+    if (!cfg.dynamic) {
+      transformExplainer(el, cfg.anchor);
+      return;
+    }
+
+    var mo = new MutationObserver(function () {
+      if (el.innerHTML.trim() && !installed.has(el.id)) {
+        transformExplainer(el, cfg.anchor);
+      }
+    });
+    mo.observe(el, { childList: true, characterData: true, subtree: true });
+
+    if (el.innerHTML.trim()) transformExplainer(el, cfg.anchor);
+  }
+
+  function init() {
+    INFO_TARGETS.forEach(function (cfg) { setupDynamic(cfg); });
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', init);
+  } else {
+    init();
+  }
+})();
+</script>
+
+<!-- ── Format Head-to-Head Comparison Table ───────────────────────────── -->
+<script>
+(function () {
+  'use strict';
+
+  var FORMAT_COLORS = {
+    'Barre 57':   { bg: 'rgba(245,158,11,.12)',  border: 'rgba(245,158,11,.45)',  text: '#b45309' },
+    'PowerCycle': { bg: 'rgba(99,102,241,.12)',   border: 'rgba(99,102,241,.45)',  text: '#4338ca' },
+    'Strength':   { bg: 'rgba(236,72,153,.12)',   border: 'rgba(236,72,153,.45)',  text: '#be185d' }
+  };
+  var FORMAT_ORDER = ['Barre 57', 'PowerCycle', 'Strength'];
+
+  function parseNum(s) {
+    s = String(s || '').trim().replace(/,/g, '');
+    if (!s || s === '-') return 0;
+    var m;
+    m = s.match(/₹?\s*([\d.]+)\s*Cr/i); if (m) return parseFloat(m[1]) * 10000000;
+    m = s.match(/₹?\s*([\d.]+)\s*L/i);  if (m) return parseFloat(m[1]) * 100000;
+    m = s.match(/₹?\s*([\d.]+)\s*K/i);  if (m) return parseFloat(m[1]) * 1000;
+    m = s.match(/([\d.]+)\s*%/);         if (m) return parseFloat(m[1]);
+    return parseFloat(s) || 0;
+  }
+
+  function fmtMoney(v) {
+    v = Number(v);
+    var sign = v < 0 ? '-' : ''; v = Math.abs(v);
+    if (v >= 10000000) return sign + '₹' + (v / 10000000).toFixed(2) + 'Cr';
+    if (v >= 100000)   return sign + '₹' + (v / 100000).toFixed(1) + 'L';
+    if (v >= 1000)     return sign + '₹' + (v / 1000).toFixed(1) + 'K';
+    return sign + '₹' + Math.round(v).toLocaleString('en-IN');
+  }
+
+  function fmtNum(v)  { return Math.round(Number(v)).toLocaleString('en-IN'); }
+  function fmtDec(v)  { return Number(v).toFixed(1); }
+  function fmtPct(v)  { return Number(v).toFixed(1) + '%'; }
+
+  function extractFormats() {
+    var tbl = document.getElementById('formatTable');
+    if (!tbl) return null;
+    var rows = tbl.querySelectorAll('tr.format-parent');
+    if (!rows.length) return null;
+
+    var result = {};
+    rows.forEach(function (tr) {
+      var cells = tr.querySelectorAll('td');
+      if (cells.length < 7) return;
+
+      var nameEl = cells[0].querySelector('.fmt-pill') || cells[0];
+      var name = nameEl.textContent.trim();
+
+      var classes    = parseNum(cells[1].textContent);
+      var pax        = parseNum(cells[2].textContent);
+      var avg        = parseNum(cells[3].textContent);
+      var fillText   = cells[4].textContent.trim();
+      var fill       = parseNum(fillText.replace(/[^0-9.%]/g, '') || fillText);
+      var lateEmpty  = cells[5].textContent.trim();
+      var revenue    = parseNum(cells[6].textContent);
+      var fvConv     = (cells[7] ? cells[7].textContent : '').trim();
+
+      var lateParts  = lateEmpty.split('/').map(function(s){ return parseNum(s.trim()); });
+      var late       = lateParts[0] || 0;
+      var empty      = lateParts[1] || 0;
+
+      var fvParts    = fvConv.split('/').map(function(s){ return parseNum(s.trim()); });
+      var firstVisits = fvParts[0] || 0;
+      var converted  = fvParts[1] || 0;
+
+      result[name] = {
+        classes, pax, avg, fill,
+        late, empty, revenue,
+        firstVisits, converted,
+        revPerClass:    classes  ? revenue / classes  : 0,
+        revPerAttendee: pax      ? revenue / pax      : 0,
+        convRate:       firstVisits ? (converted / firstVisits) * 100 : 0,
+        latePerClass:   classes  ? late  / classes    : 0,
+        emptyRate:      classes  ? (empty / classes) * 100 : 0,
+        firstVisitRate: pax      ? (firstVisits / pax) * 100 : 0
+      };
+    });
+
+    return Object.keys(result).length ? result : null;
+  }
+
+  var METRICS = [
+    { key: 'classes',       label: 'Classes',              fmt: fmtNum,   help: 'Total sessions run' },
+    { key: 'pax',           label: 'Total Attendance',     fmt: fmtNum,   help: 'Checked-in members across all sessions' },
+    { key: 'avg',           label: 'Class Average',        fmt: fmtDec,   help: 'Average attendance per session' },
+    { key: 'fill',          label: 'Fill Rate',            fmt: fmtPct,   help: 'Attendance ÷ capacity ×100' },
+    { key: 'revenue',       label: 'Revenue',              fmt: fmtMoney, help: 'Total revenue attributed to this format' },
+    { key: 'revPerClass',   label: 'Revenue / Class',      fmt: fmtMoney, help: 'Revenue ÷ classes — efficiency per session' },
+    { key: 'revPerAttendee',label: 'Revenue / Attendee',   fmt: fmtMoney, help: 'Revenue ÷ checked-in attendance — yield per body' },
+    { key: 'firstVisits',   label: 'First Visits',         fmt: fmtNum,   help: 'New members whose first class was this format' },
+    { key: 'converted',     label: 'Conversions',          fmt: fmtNum,   help: 'First-visit members who purchased a membership' },
+    { key: 'convRate',      label: 'Conversion Rate',      fmt: fmtPct,   help: 'Conversions ÷ first visits ×100' },
+    { key: 'firstVisitRate',label: 'First Visit %',        fmt: fmtPct,   help: 'First visits as % of total attendance — acquisition pull' },
+    { key: 'late',          label: 'Late Cancellations',   fmt: fmtNum,   help: 'Members who cancelled after the late window' },
+    { key: 'latePerClass',  label: 'Late CX / Class',      fmt: fmtDec,   help: 'Late cancels per session — booking reliability signal' },
+    { key: 'empty',         label: 'Empty Classes',        fmt: fmtNum,   help: 'Sessions with zero check-ins' },
+    { key: 'emptyRate',     label: 'Empty Class Rate',     fmt: fmtPct,   help: 'Empty classes ÷ total classes ×100' }
+  ];
+
+  function bestFmt(data, key, higherIsBetter) {
+    var fmts = FORMAT_ORDER.filter(function(f){ return data[f]; });
+    if (!fmts.length) return null;
+    fmts.sort(function(a,b){ return higherIsBetter ? data[b][key] - data[a][key] : data[a][key] - data[b][key]; });
+    return fmts[0];
+  }
+
+  var HIGHER_BETTER = { classes:true, pax:true, avg:true, fill:true, revenue:true, revPerClass:true,
+    revPerAttendee:true, firstVisits:true, converted:true, convRate:true, firstVisitRate:true,
+    late:false, latePerClass:false, empty:false, emptyRate:false };
+
+  function renderCompare(data) {
+    var wrap = document.getElementById('p57-format-compare-wrap');
+    var body = document.getElementById('p57-format-compare-body');
+    if (!wrap || !body) return;
+
+    var formats = FORMAT_ORDER.filter(function(f){ return data[f]; });
+    if (!formats.length) { wrap.style.display = 'none'; return; }
+
+    var headerCols = formats.map(function(f) {
+      var c = FORMAT_COLORS[f] || {};
+      return '<th style="background:' + (c.bg||'transparent') + ';border-bottom:2px solid ' + (c.border||'var(--line)') + ';color:' + (c.text||'var(--ink)') + ';font-weight:900;font-size:11px;letter-spacing:.04em;padding:11px 14px;text-align:center">' + f + '</th>';
+    }).join('');
+
+    var rows = METRICS.map(function(m) {
+      var best = bestFmt(data, m.key, HIGHER_BETTER[m.key]);
+      var cells = formats.map(function(f) {
+        var d = data[f];
+        if (!d) return '<td>—</td>';
+        var val = d[m.key];
+        var isWinner = f === best;
+        var style = isWinner ? 'font-weight:800;color:var(--ink)' : 'color:var(--muted)';
+        var badge = isWinner ? ' <span class="p57-fc-best">▲</span>' : '';
+        return '<td style="text-align:center;' + style + '">' + m.fmt(val) + badge + '</td>';
+      }).join('');
+
+      return '<tr>' +
+        '<td class="p57-fc-metric"><span class="p57-fc-metric-label">' + m.label + '</span><span class="p57-fc-metric-help">' + m.help + '</span></td>' +
+        cells +
+      '</tr>';
+    }).join('');
+
+    body.innerHTML =
+      '<table class="p57-fc-table">' +
+        '<thead><tr>' +
+          '<th class="p57-fc-metric-head">Metric</th>' +
+          headerCols +
+        '</tr></thead>' +
+        '<tbody>' + rows + '</tbody>' +
+      '</table>';
+
+    wrap.style.display = '';
+
+    var formatGrid = document.querySelector('.format-grid');
+    if (formatGrid && !formatGrid.contains(wrap)) {
+      formatGrid.appendChild(wrap);
+    }
+  }
+
+  function tryRender() {
+    var data = extractFormats();
+    if (data) renderCompare(data);
+  }
+
+  function init() {
+    var el = document.getElementById('formatTable');
+    if (!el) return;
+
+    var mo = new MutationObserver(function() {
+      setTimeout(tryRender, 60);
+    });
+    mo.observe(el, { childList: true, subtree: true });
+
+    tryRender();
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', init);
+  } else {
+    init();
+  }
+})();
+</script>
+</body>
 </html>
