@@ -4909,3 +4909,140 @@ html[data-theme="light"] .metric-card-v2 .kpi-face {
   font-size: 12px;
   line-height: 1;
 }
+
+/* Requested dashboard fixes: compact KPI rows, non-overlapping help icon, structured editable insights */
+.metrics,
+.section-kpis {
+  grid-template-columns: repeat(5, minmax(0, 1fr)) !important;
+  gap: 12px !important;
+}
+
+.metric-card-v2 {
+  min-height: 174px !important;
+  border-radius: 22px !important;
+}
+
+.metric-card-v2 .kpi-face {
+  border-radius: 22px !important;
+}
+
+.metric-card-v2 .kpi-front {
+  padding: 14px 14px 12px !important;
+}
+
+.metric-card-v2 .kpi-header {
+  display: grid !important;
+  grid-template-columns: minmax(0, 1fr) !important;
+  padding-right: 28px !important;
+  gap: 7px !important;
+}
+
+.metric-card-v2 .kpi-icon {
+  width: 34px !important;
+  height: 34px !important;
+  border-radius: 12px !important;
+}
+
+.metric-card-v2 .kpi-title {
+  max-width: none !important;
+  font-size: 12.5px !important;
+}
+
+.metric-card-v2 .kpi-value {
+  font-size: 1.78rem !important;
+  letter-spacing: 0 !important;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+}
+
+.metric-card-v2 .kpi-help {
+  top: 10px !important;
+  right: 10px !important;
+  width: 22px !important;
+  height: 22px !important;
+  font-size: 11px !important;
+}
+
+.metric-card-v2 .kpi-sub { font-size: 10px !important; }
+.metric-card-v2 .kpi-compare-grid { padding-top: 8px !important; gap: 6px !important; }
+.metric-card-v2 .kpi-compare-card { min-height: 43px !important; border-radius: 10px !important; }
+.metric-card-v2 .kpi-compare-card strong { font-size: 13px !important; }
+
+.combined-panel {
+  border: 1px solid color-mix(in srgb, var(--line) 90%, transparent) !important;
+  border-radius: 18px !important;
+  background: linear-gradient(135deg, color-mix(in srgb, var(--panel) 92%, var(--blue)), var(--panel)) !important;
+}
+
+.panel-summary,
+.business-explainer {
+  position: relative;
+  border: 1px solid color-mix(in srgb, var(--focus) 20%, var(--line)) !important;
+  border-left: 4px solid var(--focus) !important;
+  border-radius: 12px !important;
+  background: color-mix(in srgb, var(--panel2) 84%, var(--panel)) !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.04);
+}
+
+.formula-inline {
+  display: block;
+  margin-top: 8px;
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.summary-shell { padding-right: 112px !important; min-height: 42px; }
+.summary-toolbar { display: flex; align-items: center; gap: 6px; }
+.summary-edit-btn,
+.summary-reset-btn,
+.summary-save-btn,
+.summary-cancel-btn {
+  border: 1px solid color-mix(in srgb, var(--line) 90%, transparent);
+  background: color-mix(in srgb, var(--panel3) 70%, var(--panel));
+  color: var(--text);
+}
+
+.summary-reset-btn {
+  height: 28px;
+  padding: 0 9px;
+  border-radius: 999px;
+  font-size: 10px;
+  font-weight: 800;
+}
+
+.summary-edited-chip {
+  position: absolute;
+  right: 10px;
+  bottom: 8px;
+  color: var(--focus);
+  font-size: 10px;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.summary-editor textarea {
+  width: 100%;
+  min-height: 132px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--panel);
+  color: var(--ink);
+  resize: vertical;
+}
+
+.summary-editor-actions { display: flex; gap: 8px; margin-top: 10px; }
+.summary-save-btn,
+.summary-cancel-btn { padding: 7px 12px; border-radius: 999px; font-size: 11px; font-weight: 900; }
+.summary-save-btn { background: var(--focus); color: #fff; }
+
+@media (max-width: 1280px) {
+  .metrics,
+  .section-kpis { grid-template-columns: repeat(3, minmax(0, 1fr)) !important; }
+}
+
+@media (max-width: 760px) {
+  .metrics,
+  .section-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
+  .summary-shell { padding-right: 14px !important; padding-top: 46px !important; }
+}
