@@ -1790,9 +1790,9 @@ function compareTextForCell(header, value, parsed, rows, cellIndex, selectedInde
     ['Share of column',total&&parsed.type!=='pct'&&parsed.type!=='mult'?pct(parsed.value/total):'n/a']
   ];
 }
-function salesDrillRows(source){
+function salesDrillRows(source, period=state.period, studio=state.studio){
   if(!source || !window.SALES_DRILL_INDEX) return [];
-  const ids=window.SALES_DRILL_INDEX.index?.[`${state.period}|${state.studio}|${source.kind}:${source.value}`]||[];
+  const ids=window.SALES_DRILL_INDEX.index?.[`${period}|${studio}|${source.kind}:${source.value}`]||[];
   return ids.map(i=>window.SALES_DRILL_INDEX.rows[i]).filter(Boolean);
 }
 function sourceLabel(dataset){
@@ -1809,9 +1809,9 @@ function drillSourceDataset(source){
   };
   return map[source?.kind] || '';
 }
-function rawDrillRows(source){
+function rawDrillRows(source, period=state.period, studio=state.studio){
   if(!source || !window.RAW_DRILL_INDEX) return [];
-  const ids=window.RAW_DRILL_INDEX.index?.[`${state.period}|${state.studio}|${source.kind}:${source.value}`]||[];
+  const ids=window.RAW_DRILL_INDEX.index?.[`${period}|${studio}|${source.kind}:${source.value}`]||[];
   const dataset=drillSourceDataset(source);
   return ids.map(i=>window.RAW_DRILL_INDEX.rows?.[dataset]?.[i]).filter(Boolean);
 }
@@ -1832,9 +1832,9 @@ function salesDrillValue(row, i){
   if(i===7) return `${one(Number(row[i]||0))}%`;
   return row[i] || '-';
 }
-function salesSourceRowsFor(source, limit=300){
+function salesSourceRowsFor(source, limit=300, period=state.period, studio=state.studio){
   const dataset=drillSourceDataset(source);
-  const rows=dataset==='sales' ? salesDrillRows(source) : rawDrillRows(source);
+  const rows=dataset==='sales' ? salesDrillRows(source,period,studio) : rawDrillRows(source,period,studio);
   const picks={
     sales:[0,1,3,2,4,5,6,7,10,11,12,13,14],
     sessions:[0,1,2,3,4,5,6,7,8,9,10,11,12,13],
