@@ -582,6 +582,7 @@ function insight(label,value,sub,key,tone='gold'){
 }
 function kpiDrill(key,label){
   const c=current(), s=c.summary;
+  const sourceRows=fallbackSourceRows();
   const leadYield=Number(s.newMembers||0)/Math.max(Number(s.leadCount||0),1);
   const renewalRate=Number(s.renewedMemberships||0)/Math.max(Number(s.expiringMemberships||0),1);
   const map={
@@ -594,8 +595,8 @@ function kpiDrill(key,label){
     fillRate:[['Class','Capacity','Attended','Booked','Fill','Late CX'], c.classes.map(r=>[trunc(r.Class,36),num(r.capacity),num(r.attendance),num(r.booked),pct(r.fill),num(r.late)])],
     checkedIn:[['Format','Sessions','Attended','Capacity','Fill','Revenue'], c.formats.map(r=>[r.name,num(r.classes),num(r.attendance),num(r.capacity),pct(r.fill),money(r.revenue)])],
     lateCancels:[['Class','Late Cancels','Empty','Sessions','Avg','Fill'], c.classes.map(r=>[trunc(r.Class,34),num(r.late),num(r.empty),num(r.classes),one(r.avg),pct(r.fill)])],
-    newMembers:[['Source','New','Converted','Retained','Conversion','LTV'], c.sources.map(r=>[trunc(r.SourceClean,34),num(r.newMembers),num(r.converted),num(r.retained),pct(r.conversionRate),money(r.ltv)])],
-    converted:[['Source','New','Converted','Retained','Conversion','Visits Post'], c.sources.map(r=>[trunc(r.SourceClean,34),num(r.newMembers),num(r.converted),num(r.retained),pct(r.conversionRate),one(r.visitsPost)])],
+    newMembers:[['Source','New','Converted','Retained','Conversion','LTV'], sourceRows.map(r=>[trunc(r.SourceClean,34),num(r.newMembers),num(r.converted),num(r.retained),pct(r.conversionRate),money(r.ltv)])],
+    converted:[['Source','New','Converted','Retained','Conversion','Visits Post'], sourceRows.map(r=>[trunc(r.SourceClean,34),num(r.newMembers),num(r.converted),num(r.retained),pct(r.conversionRate),one(r.visitsPost)])],
     conversionRate:[['Type','First Visits','Converted','Retained','Conversion','LTV'], c.newTypes.map(r=>[r.NewType,num(r.trials),num(r.converted),num(r.retained),pct(r.conversionRate),money(r.ltv)])],
     retentionRate:[['Type','First Visits','Converted','Retained','Retention','LTV'], c.newTypes.map(r=>[r.NewType,num(r.trials),num(r.converted),num(r.retained),pct(r.retentionRate),money(r.ltv)])],
     leadYield:[['Lead Source','Leads','Trials','Won','Trial Rate','Win Rate'], c.leadSources.map(r=>[trunc(r.SourceGroup,34),num(r.leads),num(r.trials),num(r.won),pct(r.trialRate),pct(r.winRate)])],
@@ -605,8 +606,14 @@ function kpiDrill(key,label){
     expiringMemberships:[['Membership','Expiring','Active','Frozen','Avg Sessions','Churn'], paidChurnRows(c).map(r=>[trunc(r.MembershipClean,34),num(r.expiring),num(r.active),num(r.frozen),one(r.avgSessionsPerMonth),pct(r.churnRate)])],
     avgSessionsUsedPct:[['Membership','Active','Usage','Avg Sessions / Month','Attendance Rate','No-shows'], paidChurnRows(c).map(r=>[trunc(r.MembershipClean,34),num(r.active),pct((r.avgUsage||0)/100),one(r.avgSessionsPerMonth),pct((r.avgAttendance||0)/100),num(r.noShows)])]
   };
+  const sourceMap={
+    salesRev:{kind:'all',value:'sales'}, atv:{kind:'all',value:'sales'}, purchaseFrequency:{kind:'all',value:'sales'},
+    sessionRev:{kind:'sessionAll',value:'all'}, revenuePerClass:{kind:'sessionAll',value:'all'}, classAvg:{kind:'sessionAll',value:'all'}, fillRate:{kind:'sessionAll',value:'all'}, checkedIn:{kind:'sessionAll',value:'all'}, lateCancels:{kind:'sessionAll',value:'all'},
+    newMembers:{kind:'newAll',value:'all'}, converted:{kind:'newAll',value:'all'}, conversionRate:{kind:'newAll',value:'all'}, retentionRate:{kind:'newAll',value:'all'},
+    leadYield:{kind:'leadAll',value:'all'}, churnRate:{kind:'lapsedAll',value:'all'}, activeMemberships:{kind:'lapsedAll',value:'all'}, renewedMemberships:{kind:'lapsedAll',value:'all'}, expiringMemberships:{kind:'lapsedAll',value:'all'}, avgSessionsUsedPct:{kind:'lapsedAll',value:'all'}
+  };
   const [headers,rows]=map[key]||[['Metric','Value','Context'],[[label,metricDisplay(key,s[key]||0),'Selected month headline value'],['Lead yield',pct(leadYield),'New members / CRM leads'],['Renewal rate',pct(renewalRate),'Renewed / expiring memberships']]];
-  return {title:`${label} drill-down`, summary:`${label} is calculated for ${meta().full} in ${periodLabel()}. The linked view shows the supporting component records, related operating drivers and calculation context behind the headline value.`, headers, rows, formula: formulaFor(label)};
+  return {title:`${label} drill-down`, summary:`${label} is calculated for ${meta().full} in ${periodLabel()}. The linked view shows the supporting item-level records first when raw source rows exist, plus related operating drivers and calculation context behind the headline value.`, headers, rows, formula: formulaFor(label), source: sourceMap[key]};
 }
 function formulaFor(label){ const hit=APP.formulas.find(f=>label.toLowerCase().includes(f.metric.toLowerCase().split(' ')[0])||f.metric.toLowerCase().includes(label.toLowerCase().split(' ')[0])); return hit ? `${hit.metric}: ${hit.formula}` : ''; }
 function previousPeriod(){
