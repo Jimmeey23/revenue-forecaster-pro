@@ -612,11 +612,11 @@ function renderCockpitSummary(lines){
   el.innerHTML=`<div class="cockpit-summary-copy"><div class="cockpit-summary-kicker"><span>Studio performance brief</span></div><h2>${esc(cockpitSummaryHeadline())}</h2><p>${esc(body)}</p></div><div class="cockpit-summary-meta"><span>Sales movement</span><strong>${esc(prev?changeText(s.salesRev,prev.salesRev):'No prior month')}</strong><span>Priority driver</span><strong>${esc(topFmt.name||'Schedule mix')}</strong></div>`;
 }
 function makeEditableSummary(el){
-  if(!el || el.dataset.editableReady === '1') return;
+  if(!el) return;
   el.dataset.editableReady = '1';
   const key = summarySectionKey(el.id);
   const saved = loadSavedSummary(key);
-  if (saved) el.innerHTML = `<div class="summary-copy">${esc(saved).replace(/\n/g,'<br>')}</div>`;
+  if (saved) el.innerHTML = `<div class="summary-copy">${esc(saved).replace(/\n/g,'<br>')}</div><span class="summary-edited-chip">Edited</span>`;
   el.classList.add('summary-shell');
   if (el.querySelector('.summary-toolbar')) return;
   const toolbar = document.createElement('div');
@@ -626,17 +626,33 @@ function makeEditableSummary(el){
   btn.className = 'summary-edit-btn';
   btn.setAttribute('aria-label', `Edit ${key} summary`);
   btn.innerHTML = '<span class="summary-edit-icon">✎</span>';
-  btn.addEventListener('click', async (event) => {
+  const reset = document.createElement('button');
+  reset.type = 'button';
+  reset.className = 'summary-reset-btn';
+  reset.textContent = 'Reset to AI';
+  reset.hidden = !saved;
+  reset.addEventListener('click', event=>{
     event.stopPropagation();
-    const currentText = el.textContent.trim();
-    const draft = window.prompt(`Edit ${key} summary`, currentText);
-    if (draft === null) return;
-    const cleaned = draft.trim();
-    el.innerHTML = `<div class="summary-copy">${esc(cleaned).replace(/\n/g,'<br>')}</div>`;
-    await saveSummary(key, cleaned);
-    makeEditableSummary(el);
+    clearSavedSummary(key);
+    render();
   });
-  toolbar.append(btn);
+  btn.addEventListener('click', (event) => {
+    event.stopPropagation();
+    const currentText = plainText(el.querySelector('.summary-copy')?.textContent || el.textContent).replace(/Edited\s*Reset to AI\s*$/,'').trim();
+    const original = el.innerHTML;
+    el.innerHTML = `<div class="summary-editor"><textarea rows="5">${esc(currentText)}</textarea><div class="summary-editor-actions"><button type="button" class="summary-save-btn">Save</button><button type="button" class="summary-cancel-btn">Cancel</button></div></div>`;
+    const textarea=el.querySelector('textarea');
+    textarea?.focus();
+    el.querySelector('.summary-save-btn')?.addEventListener('click', async e=>{
+      e.stopPropagation();
+      const cleaned=(textarea?.value||'').trim();
+      await saveSummary(key, cleaned);
+      el.innerHTML = `<div class="summary-copy">${esc(cleaned).replace(/\n/g,'<br>')}</div><span class="summary-edited-chip">Edited</span>`;
+      makeEditableSummary(el);
+    });
+    el.querySelector('.summary-cancel-btn')?.addEventListener('click', e=>{ e.stopPropagation(); el.innerHTML=original; makeEditableSummary(el); });
+  });
+  toolbar.append(btn, reset);
   el.append(toolbar);
 }
 function applyEditableSummaries(){
